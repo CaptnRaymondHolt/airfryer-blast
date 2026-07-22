@@ -183,7 +183,7 @@
     <div class="chip score"><div class="lbl">Score</div><div class="val" id="score">0</div></div>
     <div class="chip best"><div class="lbl">Record</div><div class="val" id="best">0</div></div>
     <div class="chip wave"><div class="lbl">Vague</div><div class="val" id="wave">1</div></div>
-    <div class="chip lives"><div class="lbl">Vies</div><div class="val" id="lives">🧺🧺🧺</div></div>
+    <div class="chip lives"><div class="lbl">Vies</div><div class="val" id="lives">🧺🧺🧺🧺</div></div>
   </div>
 
   <div class="stage" id="stage">
@@ -311,7 +311,7 @@
   let running = false;
   let score = 0;
   let wave = 1;
-  let lives = 3;
+  let lives = 4;
   let combo = 0;
   let comboTimer = 0;
 
@@ -329,7 +329,7 @@
   const keys = { left:false, right:false, up:false, down:false };
 
   function resetState(){
-    score = 0; wave = 1; lives = 3; combo = 0; comboTimer = 0;
+    score = 0; wave = 1; lives = 4; combo = 0; comboTimer = 0;
     player = { x: W/2, y: H - 90, r: 16 };
     target.x = player.x; target.y = player.y;
     bullets = []; enemyBullets = []; enemies = []; powerups = []; particles = [];
@@ -410,7 +410,7 @@
     if (type === 'shield') shieldActive = true;
     else if (type === 'rapid') rapidTimer = 9000;
     else if (type === 'spread') spreadLevel = Math.min(2, spreadLevel + 1);
-    else if (type === 'life') { lives = Math.min(5, lives + 1); pulseChip(livesEl); }
+    else if (type === 'life') { lives = Math.min(6, lives + 1); pulseChip(livesEl); }
     updateHUD();
   }
 
@@ -639,11 +639,11 @@
       if (boss.x > W - 50) boss.dir = -1;
       boss.shootTimer -= dt;
       if (boss.shootTimer <= 0) {
-        const speed = 3.4 + wave * 0.05;
-        for (const a of [-0.5,-0.25,0,0.25,0.5]){
+        const speed = 2.8 + wave * 0.04;
+        for (const a of [-0.3, 0, 0.3]){
           enemyBullets.push({ x: boss.x, y: boss.y + boss.r, vx: Math.sin(a)*speed, vy: Math.cos(a)*speed, r: 5 });
         }
-        boss.shootTimer = rand(1000, 1500);
+        boss.shootTimer = rand(1400, 2000);
       }
       if (invulnTimer <= 0 && dist2(boss.x,boss.y,player.x,player.y) < (boss.r + player.r)*(boss.r + player.r)) {
         hitPlayer();
