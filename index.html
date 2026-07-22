@@ -192,7 +192,7 @@
     <div class="overlay" id="startOverlay">
       <div class="bigemoji">🍟🚀</div>
       <h2>Air Fryer Blast</h2>
-      <p>Ta friteuse a pris son envol ! Dégomme les surgelés envahisseurs (frites, nuggets, mini-pizzas, glaçons) avant qu'ils n'atteignent le fond du panier. Ramasse les bonus 🧈🌶️🥄❤️, survis aux vagues de boss 🛍️.</p>
+      <p>Ta friteuse a pris son envol ! Dégomme les surgelés envahisseurs (frites, nuggets, pizzas, glaçons, donuts, pop-corn) avant qu'ils n'atteignent le fond du panier. Ramasse les bonus 🧈🌶️🥄🔪⚡💣❤️, slalome entre les grilles 🧱, et survis aux boss 🛍️🧊🍕.</p>
       <p class="hint">Clavier : <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> ou <kbd>WASD</kbd> — tir automatique.<br>Tactile / souris : glisse le doigt sur l'écran pour piloter.</p>
       <button class="primary" id="startBtn">Décoller</button>
     </div>
@@ -295,15 +295,21 @@
 
   // ---------- enemy types ----------
   const ENEMY_TYPES = {
-    frite:  { emoji: '🍟', hp: 1, r: 15, speed: 1.6, points: 10, pattern: 'zigzag' },
-    nugget: { emoji: '🍗', hp: 2, r: 16, speed: 1.15, points: 20, pattern: 'straight', shoots: true },
-    pizza:  { emoji: '🍕', hp: 3, r: 18, speed: 0.85, points: 35, pattern: 'sine', shoots: true, spreadShot: true },
-    glacon: { emoji: '🧊', hp: 1, r: 14, speed: 2.2, points: 15, pattern: 'erratic' },
+    frite:   { emoji: '🍟', hp: 1, r: 15, speed: 1.6, points: 10, pattern: 'zigzag' },
+    nugget:  { emoji: '🍗', hp: 2, r: 16, speed: 1.15, points: 20, pattern: 'straight', shoots: true },
+    pizza:   { emoji: '🍕', hp: 3, r: 18, speed: 0.85, points: 35, pattern: 'sine', shoots: true, spreadShot: true },
+    glacon:  { emoji: '🧊', hp: 1, r: 14, speed: 2.2, points: 15, pattern: 'erratic' },
+    donut:   { emoji: '🍩', hp: 3, r: 17, speed: 1.0, points: 28, pattern: 'homing' },
+    popcorn: { emoji: '🍿', hp: 2, r: 14, speed: 1.9, points: 18, pattern: 'zigzag', splits: true },
+    kernel:  { emoji: '🌽', hp: 1, r: 9,  speed: 2.4, points: 8,  pattern: 'erratic' },
   };
   const POWERUP_TYPES = {
     shield: { emoji: '🧈', weight: 3 },
     rapid:  { emoji: '🌶️', weight: 3 },
     spread: { emoji: '🥄', weight: 3 },
+    pierce: { emoji: '🔪', weight: 2 },
+    turbo:  { emoji: '⚡', weight: 2 },
+    bomb:   { emoji: '💣', weight: 1.5 },
     life:   { emoji: '❤️', weight: 1 },
   };
 
@@ -315,12 +321,12 @@
   let combo = 0;
   let comboTimer = 0;
 
-  let player, bullets, enemyBullets, enemies, powerups, particles;
+  let player, bullets, enemyBullets, enemies, powerups, particles, walls;
   let target = { x: W/2, y: H - 90 };
   let fireCooldown = 0;
-  let spreadLevel = 0, rapidTimer = 0, shieldActive = false;
+  let spreadLevel = 0, rapidTimer = 0, shieldActive = false, pierceTimer = 0, turboTimer = 0;
   let invulnTimer = 0;
-  let waveSpawnTimer = 0, waveSpawnedCount = 0, waveEnemyTarget = 0, waveSpawningDone = false;
+  let waveSpawnTimer = 0, waveSpawnedCount = 0, waveEnemyTarget = 0, waveSpawningDone = false, wallSpawnTimer = 0;
   let bossActive = false, boss = null;
   let bannerText = '', bannerTimer = 0;
   let lastTs = 0;
@@ -332,8 +338,9 @@
     score = 0; wave = 1; lives = 4; combo = 0; comboTimer = 0;
     player = { x: W/2, y: H - 90, r: 16 };
     target.x = player.x; target.y = player.y;
-    bullets = []; enemyBullets = []; enemies = []; powerups = []; particles = [];
+    bullets = []; enemyBullets = []; enemies = []; powerups = []; particles = []; walls = [];
     fireCooldown = 0; spreadLevel = 0; rapidTimer = 0; shieldActive = false; invulnTimer = 0;
+    pierceTimer = 0; turboTimer = 0; wallSpawnTimer = 1500;
     waveSpawnTimer = 0; waveSpawnedCount = 0; waveSpawningDone = false;
     bossActive = false; boss = null;
     bannerText = ''; bannerTimer = 0;
@@ -365,6 +372,8 @@
       { t: 'nugget', w: Math.min(2 + w * 0.4, 6) },
       { t: 'glacon', w: Math.min(1 + w * 0.3, 5) },
       { t: 'pizza', w: Math.min(0.5 + w * 0.3, 4) },
+      { t: 'donut', w: w >= 2 ? Math.min(1 + w * 0.3, 5) : 0 },
+      { t: 'popcorn', w: w >= 3 ? Math.min(0.8 + w * 0.25, 4) : 0 },
     ];
     const total = pool.reduce((s,p)=>s+p.w, 0);
     let r = Math.random() * total;
@@ -386,11 +395,15 @@
     });
   }
 
+  const BOSS_KINDS = ['sac', 'iceberg', 'mega'];
   function spawnBoss(){
-    const hp = 40 + wave * 12;
+    const kind = BOSS_KINDS[Math.floor(wave / 5 - 1) % BOSS_KINDS.length];
+    const hpMul = kind === 'iceberg' ? 1.15 : kind === 'mega' ? 0.9 : 1;
+    const hp = Math.round((40 + wave * 12) * hpMul);
+    const r = kind === 'iceberg' ? 38 : kind === 'mega' ? 40 : 34;
     boss = {
-      x: W/2, y: -60, r: 34, hp, maxHp: hp,
-      t: 0, dir: 1, phaseTimer: 0, shootTimer: 800,
+      kind, x: W/2, y: -60, r, hp, maxHp: hp,
+      t: 0, dir: 1, phaseTimer: 0, shootTimer: 800, spawnTimer: 2800,
       entering: true,
     };
   }
@@ -409,7 +422,17 @@
     playSound('powerup');
     if (type === 'shield') shieldActive = true;
     else if (type === 'rapid') rapidTimer = 9000;
-    else if (type === 'spread') spreadLevel = Math.min(2, spreadLevel + 1);
+    else if (type === 'spread') spreadLevel = Math.min(3, spreadLevel + 1);
+    else if (type === 'pierce') pierceTimer = 9000;
+    else if (type === 'turbo') turboTimer = 9000;
+    else if (type === 'bomb') {
+      for (const e of enemies) { addParticles(e.x, e.y, '#ffb238', 6); score += Math.round(e.def.points * 0.5); }
+      enemies.length = 0;
+      enemyBullets.length = 0;
+      if (boss) { boss.hp -= 15; if (boss.hp <= 0) killBoss(); }
+      shakeStage();
+      playSound('explode');
+    }
     else if (type === 'life') { lives = Math.min(6, lives + 1); pulseChip(livesEl); }
     updateHUD();
   }
@@ -431,6 +454,19 @@
     combo = Math.min(combo + 1, 8);
     comboTimer = 1200;
     spawnPowerup(e.x, e.y);
+    if (e.def.splits) {
+      for (const dx of [-14, 14]) {
+        const def = ENEMY_TYPES.kernel;
+        enemies.push({
+          type: 'kernel', def, x: clamp(e.x + dx, def.r, W - def.r), y: e.y,
+          hp: def.hp, maxHp: def.hp, r: def.r,
+          speed: def.speed * (1 + wave * 0.03),
+          t: 0, phase: rand(0, Math.PI*2),
+          dir: Math.random() < 0.5 ? -1 : 1,
+          shootTimer: rand(600, 1400),
+        });
+      }
+    }
     enemies.splice(idx, 1);
     playSound('explode');
     pulseChip(scoreEl);
@@ -493,16 +529,19 @@
     const sx = W / rect.width, sy = H / rect.height;
     return { x: (clientX - rect.left) * sx, y: (clientY - rect.top) * sy };
   }
+  const TOUCH_Y_OFFSET = 70;
   canvas.addEventListener('pointerdown', (e) => {
     pointerActive = true;
     const p = pointerToCanvas(e.clientX, e.clientY);
-    target.x = p.x; target.y = p.y;
+    const offset = e.pointerType === 'touch' ? TOUCH_Y_OFFSET : 0;
+    target.x = p.x; target.y = p.y - offset;
     if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
   });
   window.addEventListener('pointermove', (e) => {
     if (!pointerActive) return;
     const p = pointerToCanvas(e.clientX, e.clientY);
-    target.x = p.x; target.y = p.y;
+    const offset = e.pointerType === 'touch' ? TOUCH_Y_OFFSET : 0;
+    target.x = p.x; target.y = p.y - offset;
   });
   window.addEventListener('pointerup', () => { pointerActive = false; });
 
@@ -510,7 +549,7 @@
 
   // ---------- update ----------
   function updatePlayer(dt){
-    const speed = 0.34 * dt;
+    const speed = (turboTimer > 0 ? 0.48 : 0.34) * dt;
     if (!pointerActive) {
       if (keys.left) target.x -= speed;
       if (keys.right) target.x += speed;
@@ -519,13 +558,17 @@
     }
     target.x = clamp(target.x, player.r, W - player.r);
     target.y = clamp(target.y, player.r, H - player.r);
-    player.x += (target.x - player.x) * 0.28;
-    player.y += (target.y - player.y) * 0.28;
+    const lerp = turboTimer > 0 ? 0.42 : 0.28;
+    player.x += (target.x - player.x) * lerp;
+    player.y += (target.y - player.y) * lerp;
     player.x = clamp(player.x, player.r, W - player.r);
     player.y = clamp(player.y, player.r, H - player.r);
+    resolveWallCollision();
 
     if (invulnTimer > 0) invulnTimer -= dt;
     if (rapidTimer > 0) rapidTimer -= dt;
+    if (pierceTimer > 0) pierceTimer -= dt;
+    if (turboTimer > 0) turboTimer -= dt;
 
     fireCooldown -= dt;
     if (fireCooldown <= 0) {
@@ -538,12 +581,16 @@
   function shoot(){
     playSound('shoot');
     const speed = 8.5;
-    const angles = spreadLevel === 0 ? [0] : spreadLevel === 1 ? [-0.18, 0, 0.18] : [-0.34, -0.16, 0, 0.16, 0.34];
+    const angles = spreadLevel === 0 ? [0]
+      : spreadLevel === 1 ? [-0.18, 0, 0.18]
+      : spreadLevel === 2 ? [-0.34, -0.16, 0, 0.16, 0.34]
+      : [-0.46, -0.3, -0.14, 0, 0.14, 0.3, 0.46];
+    const pierce = pierceTimer > 0;
     for (const a of angles){
       bullets.push({
         x: player.x, y: player.y - player.r,
         vx: Math.sin(a) * speed, vy: -Math.cos(a) * speed,
-        r: 4,
+        r: 4, pierce,
       });
     }
   }
@@ -595,6 +642,10 @@
       } else if (e.def.pattern === 'erratic') {
         e.y += e.speed * dtScale;
         e.x += Math.sin(e.t / 140 + e.phase) * 3.2 * dtScale;
+      } else if (e.def.pattern === 'homing') {
+        e.y += e.speed * 0.75 * dtScale;
+        const dx = player.x - e.x;
+        e.x += clamp(dx, -1, 1) * 1.1 * dtScale;
       }
       e.x = clamp(e.x, e.r, W - e.r);
 
@@ -617,7 +668,7 @@
       for (let j = bullets.length - 1; j >= 0; j--){
         const b = bullets[j];
         if (dist2(b.x,b.y,e.x,e.y) < (b.r + e.r)*(b.r + e.r)) {
-          bullets.splice(j,1);
+          if (!b.pierce) bullets.splice(j,1);
           e.hp--;
           if (e.hp <= 0) { killEnemy(e, i); }
           break;
@@ -634,16 +685,49 @@
       if (boss.y >= 90) boss.entering = false;
     } else {
       boss.t += dt;
-      boss.x += boss.dir * 1.1 * dtScale;
+      const moveSpeed = boss.kind === 'iceberg' ? 1.6 : 1.1;
+      boss.x += boss.dir * moveSpeed * dtScale;
       if (boss.x < 50) boss.dir = 1;
       if (boss.x > W - 50) boss.dir = -1;
+
+      if (boss.kind === 'mega') {
+        boss.spawnTimer -= dt;
+        if (boss.spawnTimer <= 0 && enemies.length < 8) {
+          const def = ENEMY_TYPES.nugget;
+          enemies.push({
+            type: 'nugget', def, x: boss.x, y: boss.y + boss.r,
+            hp: def.hp, maxHp: def.hp, r: def.r,
+            speed: def.speed * (1 + wave * 0.03),
+            t: 0, phase: rand(0, Math.PI*2), dir: 1,
+            shootTimer: rand(900, 1500),
+          });
+          boss.spawnTimer = rand(2600, 3400);
+        }
+      }
+
       boss.shootTimer -= dt;
       if (boss.shootTimer <= 0) {
-        const speed = 2.8 + wave * 0.04;
-        for (const a of [-0.3, 0, 0.3]){
-          enemyBullets.push({ x: boss.x, y: boss.y + boss.r, vx: Math.sin(a)*speed, vy: Math.cos(a)*speed, r: 5 });
+        if (boss.kind === 'iceberg') {
+          const speed = 3 + wave * 0.04;
+          const n = 8;
+          for (let k = 0; k < n; k++){
+            const a = (Math.PI * 2 / n) * k;
+            enemyBullets.push({ x: boss.x, y: boss.y, vx: Math.sin(a)*speed, vy: Math.cos(a)*speed, r: 5 });
+          }
+          boss.shootTimer = rand(1700, 2300);
+        } else if (boss.kind === 'mega') {
+          const speed = 2.6 + wave * 0.03;
+          for (const a of [-0.5, -0.25, 0, 0.25, 0.5]){
+            enemyBullets.push({ x: boss.x, y: boss.y + boss.r, vx: Math.sin(a)*speed, vy: Math.cos(a)*speed, r: 5 });
+          }
+          boss.shootTimer = rand(1600, 2200);
+        } else {
+          const speed = 2.8 + wave * 0.04;
+          for (const a of [-0.3, 0, 0.3]){
+            enemyBullets.push({ x: boss.x, y: boss.y + boss.r, vx: Math.sin(a)*speed, vy: Math.cos(a)*speed, r: 5 });
+          }
+          boss.shootTimer = rand(1400, 2000);
         }
-        boss.shootTimer = rand(1400, 2000);
       }
       if (invulnTimer <= 0 && dist2(boss.x,boss.y,player.x,player.y) < (boss.r + player.r)*(boss.r + player.r)) {
         hitPlayer();
@@ -651,7 +735,7 @@
       for (let j = bullets.length - 1; j >= 0; j--){
         const b = bullets[j];
         if (dist2(b.x,b.y,boss.x,boss.y) < (b.r + boss.r)*(b.r + boss.r)) {
-          bullets.splice(j,1);
+          if (!b.pierce) bullets.splice(j,1);
           boss.hp--;
           if (boss.hp <= 0) { killBoss(); return; }
         }
@@ -670,6 +754,44 @@
         powerups.splice(i,1);
       }
     }
+  }
+
+  function spawnWallPair(){
+    const gapW = Math.max(90, 150 - wave * 3);
+    const gapX = rand(20, W - 20 - gapW);
+    const thickness = 20;
+    const speed = 1.3 + wave * 0.02;
+    walls.push({ x: 0, y: -thickness, w: gapX, h: thickness, speed });
+    walls.push({ x: gapX + gapW, y: -thickness, w: W - (gapX + gapW), h: thickness, speed });
+  }
+
+  function updateWalls(dt){
+    const dtScale = dt / 16.67;
+    for (let i = walls.length - 1; i >= 0; i--){
+      const w = walls[i];
+      w.y += w.speed * dtScale;
+      if (w.y > H) walls.splice(i,1);
+    }
+  }
+
+  function resolveWallCollision(){
+    for (const w of walls){
+      const closestX = clamp(player.x, w.x, w.x + w.w);
+      const closestY = clamp(player.y, w.y, w.y + w.h);
+      const dx = player.x - closestX, dy = player.y - closestY;
+      const d2 = dx*dx + dy*dy;
+      if (d2 < player.r * player.r) {
+        const d = Math.sqrt(d2) || 0.001;
+        const overlap = player.r - d;
+        const nx = dx / d, ny = dy / d;
+        player.x += nx * overlap;
+        player.y += ny * overlap;
+        target.x += nx * overlap;
+        target.y += ny * overlap;
+      }
+    }
+    player.x = clamp(player.x, player.r, W - player.r);
+    player.y = clamp(player.y, player.r, H - player.r);
   }
 
   function updateParticles(dt){
@@ -696,6 +818,14 @@
       return;
     }
 
+    if (wave >= 2) {
+      wallSpawnTimer -= dt;
+      if (wallSpawnTimer <= 0) {
+        spawnWallPair();
+        wallSpawnTimer = Math.max(1800 - wave * 20, 900);
+      }
+    }
+
     if (!waveSpawningDone) {
       waveSpawnTimer -= dt;
       if (waveSpawnTimer <= 0 && waveSpawnedCount < waveEnemyTarget) {
@@ -710,12 +840,20 @@
   }
 
   // ---------- draw ----------
+  const BIOMES = [
+    { top: [30,20,58], bottom: [12,12,28], dot1: '#7fd6ff', dot2: '#ffd34d' },
+    { top: [18,38,68], bottom: [8,14,30],  dot1: '#bfe9ff', dot2: '#eaf7ff' },
+    { top: [66,26,22], bottom: [28,10,10], dot1: '#ffb238', dot2: '#ff6a3d' },
+  ];
+  function currentBiome(){
+    return BIOMES[Math.floor((wave-1) / 5) % BIOMES.length];
+  }
   function drawBackground(t){
     ctx.clearRect(0,0,W,H);
-    const heat = clamp((wave-1) / 12, 0, 1);
+    const biome = currentBiome();
     const g = ctx.createLinearGradient(0,0,0,H);
-    g.addColorStop(0, `rgb(${20+heat*60},${20+heat*20},${50-heat*20})`);
-    g.addColorStop(1, `rgb(${10+heat*40},${12+heat*10},${26-heat*10})`);
+    g.addColorStop(0, `rgb(${biome.top.join(',')})`);
+    g.addColorStop(1, `rgb(${biome.bottom.join(',')})`);
     ctx.fillStyle = g;
     ctx.fillRect(0,0,W,H);
 
@@ -726,7 +864,7 @@
       const by = (t/12 + i*80) % (H+40) - 20;
       ctx.beginPath();
       ctx.arc(bx, by, 2 + (i%3), 0, Math.PI*2);
-      ctx.fillStyle = i % 2 === 0 ? '#7fd6ff' : '#ffd34d';
+      ctx.fillStyle = i % 2 === 0 ? biome.dot1 : biome.dot2;
       ctx.fill();
     }
     ctx.restore();
@@ -776,9 +914,10 @@
     }
   }
 
+  const BOSS_EMOJI = { sac: '🛍️', iceberg: '🧊', mega: '🍕' };
   function drawBoss(){
     if (!boss) return;
-    drawEmoji('🛍️', boss.x, boss.y, 70);
+    drawEmoji(BOSS_EMOJI[boss.kind] || '🛍️', boss.x, boss.y, boss.r * 2);
     const w = 200;
     ctx.fillStyle = 'rgba(0,0,0,.45)';
     ctx.fillRect(W/2 - w/2, 14, w, 10);
@@ -786,6 +925,23 @@
     ctx.fillRect(W/2 - w/2, 14, w * (boss.hp/boss.maxHp), 10);
     ctx.strokeStyle = 'rgba(255,255,255,.5)';
     ctx.strokeRect(W/2 - w/2, 14, w, 10);
+  }
+
+  function drawWalls(){
+    for (const w of walls){
+      const g = ctx.createLinearGradient(w.x, w.y, w.x, w.y + w.h);
+      g.addColorStop(0, '#c8ccd6');
+      g.addColorStop(1, '#7d8394');
+      ctx.fillStyle = g;
+      ctx.fillRect(w.x, w.y, w.w, w.h);
+      ctx.strokeStyle = 'rgba(0,0,0,.35)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(w.x, w.y, w.w, w.h);
+      ctx.fillStyle = 'rgba(0,0,0,.25)';
+      for (let bx = w.x + 8; bx < w.x + w.w - 4; bx += 12){
+        ctx.fillRect(bx, w.y + 3, 3, w.h - 6);
+      }
+    }
   }
 
   function drawPowerups(){
@@ -819,6 +975,7 @@
 
   function draw(t){
     drawBackground(t);
+    drawWalls();
     drawParticles();
     drawPowerups();
     drawBullets();
@@ -840,6 +997,7 @@
     updateBullets(dt);
     updateEnemies(dt);
     updateBoss(dt);
+    updateWalls(dt);
     updatePowerups(dt);
     updateParticles(dt);
     updateWave(dt);
@@ -889,7 +1047,7 @@
 
   // initial static frame
   player = { x: W/2, y: H - 90, r: 16 };
-  bullets = []; enemyBullets = []; enemies = []; powerups = []; particles = [];
+  bullets = []; enemyBullets = []; enemies = []; powerups = []; particles = []; walls = [];
   draw(0);
 })();
 </script>
