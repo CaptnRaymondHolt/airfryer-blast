@@ -169,13 +169,15 @@
     box-shadow: inset 0 -2px 0 rgba(0,0,0,.3);
   }
 
-  #muteBtn {
-    position: fixed; top: max(8px, env(safe-area-inset-top)); right: 10px; z-index: 30;
+  .iconBtn {
+    position: fixed; top: max(8px, env(safe-area-inset-top)); z-index: 30;
     width: 38px; height: 38px; border-radius: 50%;
     background: rgba(8,16,30,.6); border: 1px solid rgba(94,241,255,.4);
     box-shadow: 0 0 10px rgba(94,241,255,.3);
     color: #fff; font-size: 1rem; cursor: pointer;
   }
+  #muteBtn { right: 10px; }
+  #pauseBtn { right: 56px; }
   footer {
     font-size: .72rem; opacity: .55; margin: 2px 0 0;
     padding-bottom: env(safe-area-inset-bottom);
@@ -221,11 +223,18 @@
       <p class="newbest hidden" id="newBestMsg">🏆 Nouveau record !</p>
       <button class="primary" id="restartBtn">Redécoller</button>
     </div>
+
+    <div class="overlay hidden" id="pauseOverlay">
+      <div class="bigemoji">⏸️</div>
+      <h2>Pause</h2>
+      <button class="primary" id="resumeBtn">Reprendre</button>
+    </div>
   </div>
 
   <footer>Glisse ou utilise les flèches pour piloter · tir automatique</footer>
 
-  <button id="muteBtn" aria-label="Son">🔊</button>
+  <button id="pauseBtn" class="iconBtn" aria-label="Pause">⏸</button>
+  <button id="muteBtn" class="iconBtn" aria-label="Son">🔊</button>
 
 <script>
 (function(){
@@ -249,6 +258,9 @@
   const startBtn = document.getElementById('startBtn');
   const restartBtn = document.getElementById('restartBtn');
   const muteBtn = document.getElementById('muteBtn');
+  const pauseOverlay = document.getElementById('pauseOverlay');
+  const pauseBtn = document.getElementById('pauseBtn');
+  const resumeBtn = document.getElementById('resumeBtn');
 
   const BEST_KEY = 'airfryerblast_best';
   const MUTE_KEY = 'airfryerblast_muted';
@@ -309,6 +321,9 @@
     void el.offsetWidth;
     el.classList.add('pop');
   }
+  function vibrate(pattern){
+    if (navigator.vibrate) { try { navigator.vibrate(pattern); } catch(err) { /* unsupported, ignore */ } }
+  }
   function rotateVec(x, y, ang){
     const c = Math.cos(ang), s = Math.sin(ang);
     return { x: x*c - y*s, y: x*s + y*c };
@@ -347,7 +362,8 @@
   let combo = 0;
   let comboTimer = 0;
 
-  let player, bullets, enemyBullets, enemies, powerups, particles, walls;
+  let player, bullets, enemyBullets, enemies, powerups, particles, walls, floatingTexts;
+  let paused = false;
   let target = { x: W/2, y: H - 90 };
   let fireCooldown = 0;
   let spreadLevel = 0, rapidTimer = 0, shieldActive = false, pierceTimer = 0, turboTimer = 0;
@@ -365,7 +381,7 @@
     score = 0; wave = 1; lives = 4; combo = 0; comboTimer = 0;
     player = { x: W/2, y: H - 90, r: 16 };
     target.x = player.x; target.y = player.y;
-    bullets = []; enemyBullets = []; enemies = []; powerups = []; particles = []; walls = [];
+    bullets = []; enemyBullets = []; enemies = []; powerups = []; particles = []; walls = []; floatingTexts = [];
     fireCooldown = 0; spreadLevel = 0; rapidTimer = 0; shieldActive = false; invulnTimer = 0;
     pierceTimer = 0; turboTimer = 0; wallSpawnTimer = 1500; trailTimer = 0;
     waveSpawnTimer = 0; waveSpawnedCount = 0; waveSpawningDone = false;
@@ -478,9 +494,15 @@
     }
   }
 
+  function spawnFloatingText(x, y, text, color){
+    floatingTexts.push({ x, y, text, color: color || '#ffe27a', life: 700, maxLife: 700 });
+  }
+
   function killEnemy(e, idx){
     addParticles(e.x, e.y, '#ffb238', 10);
-    score += Math.round(e.def.points * (1 + combo * 0.25));
+    const gained = Math.round(e.def.points * (1 + combo * 0.25));
+    score += gained;
+    spawnFloatingText(e.x, e.y - e.r - 6, '+' + gained);
     combo = Math.min(combo + 1, 8);
     comboTimer = 1200;
     spawnPowerup(e.x, e.y);
@@ -497,13 +519,16 @@
 
   function killBoss(){
     addParticles(boss.x, boss.y, '#ff8a3d', 40);
-    score += 500 + wave * 20;
+    const gained = 500 + wave * 20;
+    score += gained;
+    spawnFloatingText(boss.x, boss.y - 10, '+' + gained, '#ff8a3d');
     spawnPowerup(boss.x, boss.y - 10);
     spawnPowerup(boss.x - 20, boss.y);
     boss = null;
     bossActive = false;
     playSound('explode');
     pulseChip(scoreEl);
+    vibrate([30, 40, 30, 40, 60]);
   }
 
   function hitPlayer(){
@@ -513,6 +538,7 @@
       invulnTimer = 900;
       playSound('hit');
       addParticles(player.x, player.y, '#7fd6ff', 12);
+      vibrate(15);
       return;
     }
     lives--;
@@ -523,6 +549,7 @@
     addParticles(player.x, player.y, '#ff5c5c', 16);
     pulseChip(livesEl);
     updateHUD();
+    vibrate([40, 30, 40]);
     if (lives <= 0) endGame();
   }
 
@@ -862,6 +889,16 @@
     }
   }
 
+  function updateFloatingTexts(dt){
+    const dtScale = dt / 16.67;
+    for (let i = floatingTexts.length - 1; i >= 0; i--){
+      const f = floatingTexts[i];
+      f.y -= 0.9 * dtScale;
+      f.life -= dt;
+      if (f.life <= 0) floatingTexts.splice(i,1);
+    }
+  }
+
   function updateWave(dt){
     if (comboTimer > 0) { comboTimer -= dt; if (comboTimer <= 0) combo = 0; }
     if (bannerTimer > 0) bannerTimer -= dt;
@@ -1121,6 +1158,48 @@
     ctx.restore();
   }
 
+  function drawFloatingTexts(){
+    ctx.save();
+    ctx.font = '700 16px Fredoka, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    for (const f of floatingTexts){
+      ctx.globalAlpha = clamp(f.life / f.maxLife, 0, 1);
+      ctx.shadowColor = f.color;
+      ctx.shadowBlur = 8;
+      ctx.fillStyle = f.color;
+      ctx.fillText(f.text, f.x, f.y);
+    }
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
+
+  function drawCombo(){
+    if (combo <= 1 || comboTimer <= 0) return;
+    ctx.save();
+    ctx.globalAlpha = clamp(comboTimer / 1200, 0, 1);
+    ctx.font = '700 22px Bangers, cursive';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = '#ffd34d';
+    ctx.shadowBlur = 14;
+    ctx.fillStyle = '#ffe27a';
+    ctx.fillText('COMBO x' + combo, W/2, 70);
+    ctx.restore();
+  }
+
+  function drawDangerVignette(t){
+    if (lives !== 1) return;
+    const pulse = 0.15 + 0.15 * Math.sin(t / 220);
+    ctx.save();
+    const g = ctx.createRadialGradient(W/2, H/2, H*0.35, W/2, H/2, H*0.75);
+    g.addColorStop(0, 'rgba(255,40,40,0)');
+    g.addColorStop(1, `rgba(255,40,40,${pulse})`);
+    ctx.fillStyle = g;
+    ctx.fillRect(0,0,W,H);
+    ctx.restore();
+  }
+
   function drawBanner(){
     if (bannerTimer <= 0) return;
     const alpha = clamp(bannerTimer / 1600, 0, 1);
@@ -1148,7 +1227,10 @@
     drawEnemies();
     drawBoss();
     drawPlayer();
+    drawFloatingTexts();
+    drawCombo();
     drawBuffs();
+    drawDangerVignette(t);
     drawBanner();
   }
 
@@ -1167,6 +1249,7 @@
     updateWalls(dt);
     updatePowerups(dt);
     updateParticles(dt);
+    updateFloatingTexts(dt);
     updateWave(dt);
     updateHUD();
 
@@ -1179,8 +1262,11 @@
   function startGame(){
     resetState();
     running = true;
+    paused = false;
     startOverlay.classList.add('hidden');
     endOverlay.classList.add('hidden');
+    pauseOverlay.classList.add('hidden');
+    pauseBtn.textContent = '⏸';
     lastTs = 0;
     if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
     if (rafId) cancelAnimationFrame(rafId);
@@ -1200,8 +1286,25 @@
     endOverlay.classList.remove('hidden');
   }
 
+  function togglePause(){
+    if (!running) return;
+    paused = !paused;
+    if (paused) {
+      if (rafId) cancelAnimationFrame(rafId);
+      pauseOverlay.classList.remove('hidden');
+      pauseBtn.textContent = '▶️';
+    } else {
+      pauseOverlay.classList.add('hidden');
+      pauseBtn.textContent = '⏸';
+      lastTs = 0;
+      rafId = requestAnimationFrame(loop);
+    }
+  }
+
   startBtn.addEventListener('click', startGame);
   restartBtn.addEventListener('click', startGame);
+  pauseBtn.addEventListener('click', togglePause);
+  resumeBtn.addEventListener('click', togglePause);
   muteBtn.addEventListener('click', () => {
     muted = !muted;
     localStorage.setItem(MUTE_KEY, muted ? '1' : '0');
@@ -1209,12 +1312,15 @@
   });
 
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) { lastTs = 0; resetInputState(); }
+    if (document.hidden) {
+      resetInputState();
+      if (running && !paused) togglePause();
+    }
   });
 
   // initial static frame
   player = { x: W/2, y: H - 90, r: 16 };
-  bullets = []; enemyBullets = []; enemies = []; powerups = []; particles = []; walls = [];
+  bullets = []; enemyBullets = []; enemies = []; powerups = []; particles = []; walls = []; floatingTexts = [];
   draw(0);
 })();
 </script>
