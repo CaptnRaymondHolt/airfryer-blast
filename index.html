@@ -28,9 +28,9 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 10px;
+    justify-content: flex-start;
+    gap: 6px;
+    padding: 8px;
     overflow: hidden;
     touch-action: none;
     overscroll-behavior: none;
@@ -40,7 +40,7 @@
     background-size: 400% 400%;
     animation: bgshift 18s ease infinite;
   }
-  body { min-height: 100dvh; }
+  body { min-height: 100dvh; width: 100%; }
   @keyframes bgshift {
     0% { background-position: 0% 50%; }
     50% { background-position: 100% 50%; }
@@ -93,6 +93,13 @@
 
   .stage {
     position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+    max-width: 520px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     border-radius: 18px;
     padding: 8px;
     background: linear-gradient(160deg, rgba(255,255,255,.12), rgba(0,0,0,.25));
@@ -107,8 +114,8 @@
   }
   canvas {
     display: block;
-    max-width: min(92vw, 420px);
-    max-height: 66vh;
+    max-width: 100%;
+    max-height: 100%;
     width: auto; height: auto;
     aspect-ratio: 390 / 680;
     border-radius: 12px;
@@ -171,6 +178,14 @@
     font-size: .72rem; opacity: .55; margin: 2px 0 0;
     padding-bottom: env(safe-area-inset-bottom);
     text-align: center;
+  }
+  @media (max-height: 700px) {
+    h1 { font-size: clamp(18px, 5.5vw, 28px); }
+    .tagline { display: none; }
+    .hud { gap: 5px; }
+    .chip { padding: 3px 8px; min-width: 50px; }
+    .chip .val { font-size: 17px; }
+    footer { font-size: .62rem; }
   }
 </style>
 </head>
@@ -292,6 +307,15 @@
     void el.offsetWidth;
     el.classList.add('pop');
   }
+  function rotateVec(x, y, ang){
+    const c = Math.cos(ang), s = Math.sin(ang);
+    return { x: x*c - y*s, y: x*s + y*c };
+  }
+  const MAX_ENEMY_BULLETS = 70;
+  function spawnEnemyBullet(b){
+    if (enemyBullets.length >= MAX_ENEMY_BULLETS) return;
+    enemyBullets.push(b);
+  }
 
   // ---------- enemy types ----------
   const ENEMY_TYPES = {
@@ -299,7 +323,7 @@
     nugget:  { emoji: '🍗', hp: 2, r: 16, speed: 1.15, points: 20, pattern: 'straight', shoots: true },
     pizza:   { emoji: '🍕', hp: 3, r: 18, speed: 0.85, points: 35, pattern: 'sine', shoots: true, spreadShot: true },
     glacon:  { emoji: '🧊', hp: 1, r: 14, speed: 2.2, points: 15, pattern: 'erratic' },
-    donut:   { emoji: '🍩', hp: 3, r: 17, speed: 1.0, points: 28, pattern: 'homing' },
+    donut:   { emoji: '🍩', hp: 3, r: 17, speed: 1.0, points: 28, pattern: 'homing', shoots: true },
     popcorn: { emoji: '🍿', hp: 2, r: 14, speed: 1.9, points: 18, pattern: 'zigzag', splits: true },
     kernel:  { emoji: '🌽', hp: 1, r: 9,  speed: 2.4, points: 8,  pattern: 'erratic' },
   };
@@ -614,15 +638,22 @@
   }
 
   function enemyShoot(e){
-    const speed = 3 + wave * 0.08;
+    const speed = Math.min(3 + wave * 0.08, 6.5);
     if (e.def.spreadShot) {
-      for (const a of [-0.3, 0, 0.3]){
-        enemyBullets.push({ x: e.x, y: e.y, vx: Math.sin(a)*speed, vy: Math.cos(a)*speed, r: 5 });
+      const angles = wave >= 12 ? [-0.4, -0.2, 0, 0.2, 0.4] : [-0.3, 0, 0.3];
+      for (const a of angles){
+        spawnEnemyBullet({ x: e.x, y: e.y, vx: Math.sin(a)*speed, vy: Math.cos(a)*speed, r: 5 });
       }
     } else {
       const dx = player.x - e.x, dy = player.y - e.y;
       const len = Math.max(1, Math.hypot(dx, dy));
-      enemyBullets.push({ x: e.x, y: e.y, vx: (dx/len)*speed, vy: (dy/len)*speed, r: 5 });
+      const dirx = dx/len, diry = dy/len;
+      const count = wave >= 15 ? 3 : wave >= 6 ? 2 : 1;
+      for (let k = 0; k < count; k++){
+        const off = (k - (count-1)/2) * 0.22;
+        const v = rotateVec(dirx, diry, off);
+        spawnEnemyBullet({ x: e.x, y: e.y, vx: v.x*speed, vy: v.y*speed, r: 5 });
+      }
     }
   }
 
@@ -653,7 +684,7 @@
         e.shootTimer -= dt;
         if (e.shootTimer <= 0 && e.y > 10 && e.y < H - 60) {
           enemyShoot(e);
-          e.shootTimer = rand(1300, 2200) - wave * 30;
+          e.shootTimer = Math.max(rand(1300, 2200) - wave * 30, 550);
         }
       }
 
@@ -708,23 +739,25 @@
       boss.shootTimer -= dt;
       if (boss.shootTimer <= 0) {
         if (boss.kind === 'iceberg') {
-          const speed = 3 + wave * 0.04;
-          const n = 8;
+          const speed = Math.min(3 + wave * 0.04, 5.5);
+          const n = Math.min(8 + Math.floor(wave / 10) * 2, 14);
           for (let k = 0; k < n; k++){
             const a = (Math.PI * 2 / n) * k;
-            enemyBullets.push({ x: boss.x, y: boss.y, vx: Math.sin(a)*speed, vy: Math.cos(a)*speed, r: 5 });
+            spawnEnemyBullet({ x: boss.x, y: boss.y, vx: Math.sin(a)*speed, vy: Math.cos(a)*speed, r: 5 });
           }
           boss.shootTimer = rand(1700, 2300);
         } else if (boss.kind === 'mega') {
-          const speed = 2.6 + wave * 0.03;
-          for (const a of [-0.5, -0.25, 0, 0.25, 0.5]){
-            enemyBullets.push({ x: boss.x, y: boss.y + boss.r, vx: Math.sin(a)*speed, vy: Math.cos(a)*speed, r: 5 });
+          const speed = Math.min(2.6 + wave * 0.03, 5);
+          const angles = wave >= 15 ? [-0.6,-0.4,-0.2,0,0.2,0.4,0.6] : [-0.5, -0.25, 0, 0.25, 0.5];
+          for (const a of angles){
+            spawnEnemyBullet({ x: boss.x, y: boss.y + boss.r, vx: Math.sin(a)*speed, vy: Math.cos(a)*speed, r: 5 });
           }
           boss.shootTimer = rand(1600, 2200);
         } else {
-          const speed = 2.8 + wave * 0.04;
-          for (const a of [-0.3, 0, 0.3]){
-            enemyBullets.push({ x: boss.x, y: boss.y + boss.r, vx: Math.sin(a)*speed, vy: Math.cos(a)*speed, r: 5 });
+          const speed = Math.min(2.8 + wave * 0.04, 5);
+          const angles = wave >= 10 ? [-0.4, -0.2, 0, 0.2, 0.4] : [-0.3, 0, 0.3];
+          for (const a of angles){
+            spawnEnemyBullet({ x: boss.x, y: boss.y + boss.r, vx: Math.sin(a)*speed, vy: Math.cos(a)*speed, r: 5 });
           }
           boss.shootTimer = rand(1400, 2000);
         }
