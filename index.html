@@ -3,9 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <title>Air Fryer Blast 🍟🚀</title>
-<meta name="description" content="Air Fryer Blast - Shoot 'em up vertical : décolle avec ta friteuse et dégomme les surgelés envahisseurs !">
+<meta name="description" content="Air Fryer Blast - Shoot 'em up vertical néon façon Tron : décolle avec ta friteuse et dégomme les surgelés envahisseurs !">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#1a1030">
+<meta name="theme-color" content="#05070f">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27><text y=%27.9em%27 font-size=%2790%27>🍟</text></svg>">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -209,7 +210,7 @@
       <div class="bigemoji">🍟🚀</div>
       <h2>Air Fryer Blast</h2>
       <p>Ta friteuse a pris son envol ! Dégomme les surgelés envahisseurs (frites, nuggets, pizzas, glaçons, donuts, pop-corn) avant qu'ils n'atteignent le fond du panier. Ramasse les bonus 🧈🌶️🥄🔪⚡💣❤️, slalome entre les grilles 🧱, et survis aux boss 🛍️🧊🍕.</p>
-      <p class="hint">Clavier : <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> ou <kbd>WASD</kbd> — tir automatique.<br>Tactile / souris : glisse le doigt sur l'écran pour piloter.</p>
+      <p class="hint">Clavier : <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> ou <kbd>WASD</kbd> — tir automatique.<br>Tactile / souris : glisse le doigt sur l'écran, le vaisseau reste visible au-dessus.</p>
       <button class="primary" id="startBtn">Décoller</button>
     </div>
 
@@ -407,18 +408,21 @@
     return 'frite';
   }
 
-  function spawnEnemy(){
-    const typeKey = weightedEnemyType();
+  function makeEnemy(typeKey, x, y, extra){
     const def = ENEMY_TYPES[typeKey];
-    const x = rand(30, W - 30);
-    enemies.push({
-      type: typeKey, def, x, y: -30,
+    return Object.assign({
+      type: typeKey, def, x, y,
       hp: def.hp, maxHp: def.hp, r: def.r,
       speed: def.speed * (1 + wave * 0.03),
       t: 0, phase: rand(0, Math.PI*2),
       dir: Math.random() < 0.5 ? -1 : 1,
       shootTimer: rand(600, 1400),
-    });
+    }, extra || {});
+  }
+
+  function spawnEnemy(){
+    const typeKey = weightedEnemyType();
+    enemies.push(makeEnemy(typeKey, rand(30, W - 30), -30));
   }
 
   const BOSS_KINDS = ['sac', 'iceberg', 'mega'];
@@ -429,7 +433,7 @@
     const r = kind === 'iceberg' ? 38 : kind === 'mega' ? 40 : 34;
     boss = {
       kind, x: W/2, y: -60, r, hp, maxHp: hp,
-      t: 0, dir: 1, phaseTimer: 0, shootTimer: 800, spawnTimer: 2800,
+      t: 0, dir: 1, shootTimer: 800, spawnTimer: 2800,
       entering: true,
     };
   }
@@ -481,16 +485,9 @@
     comboTimer = 1200;
     spawnPowerup(e.x, e.y);
     if (e.def.splits) {
+      const r = ENEMY_TYPES.kernel.r;
       for (const dx of [-14, 14]) {
-        const def = ENEMY_TYPES.kernel;
-        enemies.push({
-          type: 'kernel', def, x: clamp(e.x + dx, def.r, W - def.r), y: e.y,
-          hp: def.hp, maxHp: def.hp, r: def.r,
-          speed: def.speed * (1 + wave * 0.03),
-          t: 0, phase: rand(0, Math.PI*2),
-          dir: Math.random() < 0.5 ? -1 : 1,
-          shootTimer: rand(600, 1400),
-        });
+        enemies.push(makeEnemy('kernel', clamp(e.x + dx, r, W - r), e.y));
       }
     }
     enemies.splice(idx, 1);
@@ -533,7 +530,8 @@
     scoreEl.textContent = score;
     waveEl.textContent = wave;
     bestEl.textContent = best;
-    livesEl.textContent = '🧺'.repeat(Math.max(0, lives));
+    const shown = clamp(lives, 0, 5);
+    livesEl.textContent = '🧺'.repeat(shown) + (lives > 5 ? ` +${lives - 5}` : '');
   }
 
   // ---------- input ----------
@@ -557,6 +555,7 @@
   }
   const TOUCH_Y_OFFSET = 70;
   canvas.addEventListener('pointerdown', (e) => {
+    if (!e.isPrimary) return;
     pointerActive = true;
     const p = pointerToCanvas(e.clientX, e.clientY);
     const offset = e.pointerType === 'touch' ? TOUCH_Y_OFFSET : 0;
@@ -564,14 +563,20 @@
     if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
   });
   window.addEventListener('pointermove', (e) => {
-    if (!pointerActive) return;
+    if (!pointerActive || !e.isPrimary) return;
     const p = pointerToCanvas(e.clientX, e.clientY);
     const offset = e.pointerType === 'touch' ? TOUCH_Y_OFFSET : 0;
     target.x = p.x; target.y = p.y - offset;
   });
-  window.addEventListener('pointerup', () => { pointerActive = false; });
+  window.addEventListener('pointerup', (e) => { if (e.isPrimary) pointerActive = false; });
 
   document.addEventListener('contextmenu', (e) => e.preventDefault());
+
+  function resetInputState(){
+    keys.left = keys.right = keys.up = keys.down = false;
+    pointerActive = false;
+  }
+  window.addEventListener('blur', resetInputState);
 
   // ---------- update ----------
   function updatePlayer(dt){
@@ -737,14 +742,7 @@
       if (boss.kind === 'mega') {
         boss.spawnTimer -= dt;
         if (boss.spawnTimer <= 0 && enemies.length < 8) {
-          const def = ENEMY_TYPES.nugget;
-          enemies.push({
-            type: 'nugget', def, x: boss.x, y: boss.y + boss.r,
-            hp: def.hp, maxHp: def.hp, r: def.r,
-            speed: def.speed * (1 + wave * 0.03),
-            t: 0, phase: rand(0, Math.PI*2), dir: 1,
-            shootTimer: rand(900, 1500),
-          });
+          enemies.push(makeEnemy('nugget', boss.x, boss.y + boss.r, { dir: 1, shootTimer: rand(900, 1500) }));
           boss.spawnTimer = rand(2600, 3400);
         }
       }
@@ -822,12 +820,27 @@
 
   function resolveWallCollision(){
     for (const w of walls){
+      const insideX = player.x > w.x && player.x < w.x + w.w;
+      const insideY = player.y > w.y && player.y < w.y + w.h;
+      if (insideX && insideY) {
+        // player center landed fully inside the rect (fast movement/lerp overshoot) —
+        // closest-point push-out below would yield a zero vector, so escape via the nearest edge instead.
+        const distLeft = player.x - w.x, distRight = (w.x + w.w) - player.x;
+        const distTop = player.y - w.y, distBottom = (w.y + w.h) - player.y;
+        const minDist = Math.min(distLeft, distRight, distTop, distBottom);
+        if (minDist === distLeft) player.x = w.x - player.r;
+        else if (minDist === distRight) player.x = w.x + w.w + player.r;
+        else if (minDist === distTop) player.y = w.y - player.r;
+        else player.y = w.y + w.h + player.r;
+        target.x = player.x; target.y = player.y;
+        continue;
+      }
       const closestX = clamp(player.x, w.x, w.x + w.w);
       const closestY = clamp(player.y, w.y, w.y + w.h);
       const dx = player.x - closestX, dy = player.y - closestY;
       const d2 = dx*dx + dy*dy;
       if (d2 < player.r * player.r) {
-        const d = Math.sqrt(d2) || 0.001;
+        const d = Math.sqrt(d2);
         const overlap = player.r - d;
         const nx = dx / d, ny = dy / d;
         player.x += nx * overlap;
@@ -1073,6 +1086,41 @@
     ctx.globalAlpha = 1;
   }
 
+  function drawBuffs(){
+    const buffs = [];
+    if (shieldActive) buffs.push({ emoji: '🧈', frac: 1 });
+    if (rapidTimer > 0) buffs.push({ emoji: '🌶️', frac: rapidTimer / 9000 });
+    if (pierceTimer > 0) buffs.push({ emoji: '🔪', frac: pierceTimer / 9000 });
+    if (turboTimer > 0) buffs.push({ emoji: '⚡', frac: turboTimer / 9000 });
+    if (spreadLevel > 0) buffs.push({ emoji: '🥄', frac: 1, count: spreadLevel });
+    if (!buffs.length) return;
+    ctx.save();
+    const y = 46, size = 14, gap = 32;
+    buffs.forEach((b, i) => {
+      const x = 26 + i * gap;
+      ctx.beginPath();
+      ctx.arc(x, y, size, 0, Math.PI*2);
+      ctx.fillStyle = 'rgba(0,0,0,.4)';
+      ctx.fill();
+      ctx.strokeStyle = '#5ef1ff';
+      ctx.shadowColor = '#5ef1ff';
+      ctx.shadowBlur = 8;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(x, y, size, -Math.PI/2, -Math.PI/2 + Math.PI*2*clamp(b.frac, 0, 1));
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      drawEmoji(b.emoji, x, y, 16);
+      if (b.count > 1) {
+        ctx.font = '700 10px Fredoka, sans-serif';
+        ctx.fillStyle = '#fff';
+        ctx.textAlign = 'left';
+        ctx.fillText('x' + b.count, x + size - 5, y + size - 1);
+      }
+    });
+    ctx.restore();
+  }
+
   function drawBanner(){
     if (bannerTimer <= 0) return;
     const alpha = clamp(bannerTimer / 1600, 0, 1);
@@ -1100,6 +1148,7 @@
     drawEnemies();
     drawBoss();
     drawPlayer();
+    drawBuffs();
     drawBanner();
   }
 
@@ -1160,7 +1209,7 @@
   });
 
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) lastTs = 0;
+    if (document.hidden) { lastTs = 0; resetInputState(); }
   });
 
   // initial static frame
