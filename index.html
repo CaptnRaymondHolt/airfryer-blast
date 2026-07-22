@@ -13,9 +13,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --c1: #ff4d8d;
-    --c2: #ffd34d;
-    --c3: #7fd6ff;
+    --c1: #ff2f8f;
+    --c2: #baf6ff;
+    --c3: #5ef1ff;
     --good: #6bff9d;
     --bad: #ff5c5c;
   }
@@ -36,7 +36,7 @@
     overscroll-behavior: none;
     -webkit-touch-callout: none;
     user-select: none;
-    background: linear-gradient(-45deg, #1a1030, #1b2a5e, #3a1030, #14203a);
+    background: linear-gradient(-45deg, #04050c, #071528, #1a0420, #030a14);
     background-size: 400% 400%;
     animation: bgshift 18s ease infinite;
   }
@@ -58,12 +58,12 @@
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
-    filter: drop-shadow(0 3px 0 rgba(0,0,0,.35));
+    text-shadow: 0 0 14px rgba(94,241,255,.6), 0 0 30px rgba(255,47,143,.4), 0 3px 0 rgba(0,0,0,.35);
     animation: shimmer 6s linear infinite;
     transform: rotate(-1.5deg);
   }
   @keyframes shimmer { to { background-position: 300% 0; } }
-  .tagline { margin: -2px 0 0; font-size: 13px; opacity: .75; font-style: italic; text-align: center; }
+  .tagline { margin: -2px 0 0; font-size: 13px; opacity: .8; font-style: italic; text-align: center; text-shadow: 0 0 8px rgba(94,241,255,.5); }
 
   .hud {
     display: flex;
@@ -73,20 +73,20 @@
     align-items: center;
   }
   .chip {
-    background: rgba(255,255,255,.08);
-    border: 2px solid rgba(255,255,255,.14);
+    background: rgba(8,16,30,.6);
+    border: 2px solid rgba(94,241,255,.35);
     border-radius: 14px;
     padding: 5px 12px;
     text-align: center;
     min-width: 62px;
-    box-shadow: 0 5px 0 rgba(0,0,0,.18);
+    box-shadow: 0 0 10px rgba(94,241,255,.25), 0 5px 0 rgba(0,0,0,.18);
     transition: transform .12s ease;
   }
-  .chip .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 1.2px; opacity: .65; }
+  .chip .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 1.2px; opacity: .7; }
   .chip .val { font-family: "Bangers", cursive; font-size: 22px; line-height: 1.1; letter-spacing: 1px; }
-  .chip.score .val { color: var(--c2); }
-  .chip.best  .val { color: var(--c3); }
-  .chip.wave  .val { color: var(--good); }
+  .chip.score .val { color: var(--c2); text-shadow: 0 0 8px rgba(186,246,255,.7); }
+  .chip.best  .val { color: var(--c3); text-shadow: 0 0 8px rgba(94,241,255,.7); }
+  .chip.wave  .val { color: var(--good); text-shadow: 0 0 8px rgba(107,255,157,.7); }
   .chip.lives .val { font-size: 16px; }
   .chip.pop { animation: pop .3s ease; }
   @keyframes pop { 0%{transform:scale(1)} 40%{transform:scale(1.22) rotate(-3deg)} 100%{transform:scale(1)} }
@@ -102,8 +102,8 @@
     justify-content: center;
     border-radius: 18px;
     padding: 8px;
-    background: linear-gradient(160deg, rgba(255,255,255,.12), rgba(0,0,0,.25));
-    box-shadow: 0 20px 44px rgba(0,0,0,.5), inset 0 0 0 2px rgba(255,255,255,.08);
+    background: linear-gradient(160deg, rgba(94,241,255,.1), rgba(0,0,0,.4));
+    box-shadow: 0 0 36px rgba(94,241,255,.18), 0 20px 44px rgba(0,0,0,.6), inset 0 0 0 2px rgba(94,241,255,.28);
   }
   .stage.shake { animation: shake .35s cubic-bezier(.36,.07,.19,.97); }
   @keyframes shake {
@@ -119,7 +119,7 @@
     width: auto; height: auto;
     aspect-ratio: 390 / 680;
     border-radius: 12px;
-    background: radial-gradient(circle at 50% 0%, #22305c, #0a0e1e 78%);
+    background: radial-gradient(circle at 50% 0%, #142a46, #030509 78%);
     touch-action: none;
   }
   .overlay {
@@ -154,7 +154,7 @@
     padding: 12px 28px;
     border-radius: 999px;
     cursor: pointer;
-    box-shadow: 0 6px 0 #c9821a, 0 9px 18px rgba(0,0,0,.3);
+    box-shadow: 0 6px 0 #c9821a, 0 9px 18px rgba(0,0,0,.3), 0 0 20px rgba(94,241,255,.55);
     transition: transform .08s ease, box-shadow .08s ease;
   }
   button.primary:active { transform: translateY(4px); box-shadow: 0 2px 0 #c9821a; }
@@ -171,7 +171,8 @@
   #muteBtn {
     position: fixed; top: max(8px, env(safe-area-inset-top)); right: 10px; z-index: 30;
     width: 38px; height: 38px; border-radius: 50%;
-    background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2);
+    background: rgba(8,16,30,.6); border: 1px solid rgba(94,241,255,.4);
+    box-shadow: 0 0 10px rgba(94,241,255,.3);
     color: #fff; font-size: 1rem; cursor: pointer;
   }
   footer {
@@ -351,6 +352,7 @@
   let spreadLevel = 0, rapidTimer = 0, shieldActive = false, pierceTimer = 0, turboTimer = 0;
   let invulnTimer = 0;
   let waveSpawnTimer = 0, waveSpawnedCount = 0, waveEnemyTarget = 0, waveSpawningDone = false, wallSpawnTimer = 0;
+  let trailTimer = 0;
   let bossActive = false, boss = null;
   let bannerText = '', bannerTimer = 0;
   let lastTs = 0;
@@ -364,7 +366,7 @@
     target.x = player.x; target.y = player.y;
     bullets = []; enemyBullets = []; enemies = []; powerups = []; particles = []; walls = [];
     fireCooldown = 0; spreadLevel = 0; rapidTimer = 0; shieldActive = false; invulnTimer = 0;
-    pierceTimer = 0; turboTimer = 0; wallSpawnTimer = 1500;
+    pierceTimer = 0; turboTimer = 0; wallSpawnTimer = 1500; trailTimer = 0;
     waveSpawnTimer = 0; waveSpawnedCount = 0; waveSpawningDone = false;
     bossActive = false; boss = null;
     bannerText = ''; bannerTimer = 0;
@@ -588,6 +590,17 @@
     player.x = clamp(player.x, player.r, W - player.r);
     player.y = clamp(player.y, player.r, H - player.r);
     resolveWallCollision();
+
+    trailTimer -= dt;
+    if (trailTimer <= 0) {
+      particles.push({
+        x: player.x + rand(-4,4), y: player.y + player.r,
+        vx: rand(-0.3,0.3), vy: rand(0.7,1.3),
+        life: 260, maxLife: 260,
+        color: turboTimer > 0 ? '#fff35e' : '#5ef1ff',
+      });
+      trailTimer = 40;
+    }
 
     if (invulnTimer > 0) invulnTimer -= dt;
     if (rapidTimer > 0) rapidTimer -= dt;
@@ -874,9 +887,9 @@
 
   // ---------- draw ----------
   const BIOMES = [
-    { top: [30,20,58], bottom: [12,12,28], dot1: '#7fd6ff', dot2: '#ffd34d' },
-    { top: [18,38,68], bottom: [8,14,30],  dot1: '#bfe9ff', dot2: '#eaf7ff' },
-    { top: [66,26,22], bottom: [28,10,10], dot1: '#ffb238', dot2: '#ff6a3d' },
+    { top: [16,10,32], bottom: [4,5,12], dot1: '#7fd6ff', dot2: '#ffd34d', grid: '#5ef1ff' },
+    { top: [8,20,42],  bottom: [2,6,14], dot1: '#bfe9ff', dot2: '#eaf7ff', grid: '#7fe0ff' },
+    { top: [38,10,14], bottom: [12,3,5], dot1: '#ffb238', dot2: '#ff6a3d', grid: '#ff8a3d' },
   ];
   function currentBiome(){
     return BIOMES[Math.floor((wave-1) / 5) % BIOMES.length];
@@ -891,13 +904,33 @@
     ctx.fillRect(0,0,W,H);
 
     ctx.save();
-    ctx.globalAlpha = 0.35;
+    ctx.globalAlpha = 0.3;
+    ctx.strokeStyle = biome.grid;
+    ctx.shadowColor = biome.grid;
+    ctx.shadowBlur = 6;
+    ctx.lineWidth = 1;
+    const spacingX = 39;
+    for (let x = 0; x <= W; x += spacingX) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+    }
+    const spacingY = 44;
+    const scrollOffset = (t / 9) % spacingY;
+    for (let y = -spacingY; y <= H + spacingY; y += spacingY) {
+      const yy = y + scrollOffset;
+      ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(W, yy); ctx.stroke();
+    }
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalAlpha = 0.5;
     for (let i=0;i<18;i++){
       const bx = (i * 53 + 20) % W;
       const by = (t/12 + i*80) % (H+40) - 20;
       ctx.beginPath();
       ctx.arc(bx, by, 2 + (i%3), 0, Math.PI*2);
       ctx.fillStyle = i % 2 === 0 ? biome.dot1 : biome.dot2;
+      ctx.shadowColor = ctx.fillStyle;
+      ctx.shadowBlur = 8;
       ctx.fill();
     }
     ctx.restore();
@@ -912,81 +945,131 @@
 
   function drawPlayer(){
     if (invulnTimer > 0 && Math.floor(invulnTimer/100) % 2 === 0) return;
+    ctx.save();
+    ctx.shadowColor = turboTimer > 0 ? '#fff35e' : '#5ef1ff';
+    ctx.shadowBlur = turboTimer > 0 ? 24 : 14;
     if (shieldActive) {
       ctx.beginPath();
       ctx.arc(player.x, player.y, player.r + 8, 0, Math.PI*2);
-      ctx.strokeStyle = 'rgba(127,214,255,.8)';
+      ctx.strokeStyle = 'rgba(127,214,255,.9)';
       ctx.lineWidth = 3;
       ctx.stroke();
     }
     drawEmoji('🧺', player.x, player.y, 34);
     drawEmoji('🔥', player.x, player.y + player.r + 6, 16);
+    ctx.restore();
   }
 
   function drawBullets(){
-    ctx.fillStyle = '#ffe27a';
+    ctx.save();
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = '#5ef1ff';
+    ctx.strokeStyle = '#eafcff';
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    for (const b of bullets){
+      ctx.beginPath();
+      ctx.moveTo(b.x - b.vx*0.9, b.y - b.vy*0.9);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#baf6ff';
     for (const b of bullets){
       ctx.beginPath(); ctx.arc(b.x,b.y,b.r,0,Math.PI*2); ctx.fill();
+    }
+    ctx.shadowColor = '#ff5c3d';
+    ctx.strokeStyle = '#ffb199';
+    for (const b of enemyBullets){
+      ctx.beginPath();
+      ctx.moveTo(b.x - b.vx*0.9, b.y - b.vy*0.9);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
     }
     ctx.fillStyle = '#ff7a5c';
     for (const b of enemyBullets){
       ctx.beginPath(); ctx.arc(b.x,b.y,b.r,0,Math.PI*2); ctx.fill();
     }
+    ctx.restore();
   }
 
   function drawEnemies(){
+    ctx.save();
+    ctx.shadowColor = '#ff2f8f';
+    ctx.shadowBlur = 8;
     for (const e of enemies){
       drawEmoji(e.def.emoji, e.x, e.y, e.r*2);
       if (e.hp < e.maxHp) {
         const w = e.r*2;
+        ctx.shadowBlur = 0;
         ctx.fillStyle = 'rgba(0,0,0,.4)';
         ctx.fillRect(e.x - w/2, e.y - e.r - 10, w, 4);
         ctx.fillStyle = '#6bff9d';
         ctx.fillRect(e.x - w/2, e.y - e.r - 10, w * (e.hp/e.maxHp), 4);
+        ctx.shadowBlur = 8;
       }
     }
+    ctx.restore();
   }
 
   const BOSS_EMOJI = { sac: '🛍️', iceberg: '🧊', mega: '🍕' };
+  const BOSS_GLOW = { sac: '#ff2f8f', iceberg: '#5ef1ff', mega: '#ff8a3d' };
   function drawBoss(){
     if (!boss) return;
+    ctx.save();
+    ctx.shadowColor = BOSS_GLOW[boss.kind] || '#ff2f8f';
+    ctx.shadowBlur = 22;
     drawEmoji(BOSS_EMOJI[boss.kind] || '🛍️', boss.x, boss.y, boss.r * 2);
+    ctx.restore();
     const w = 200;
     ctx.fillStyle = 'rgba(0,0,0,.45)';
     ctx.fillRect(W/2 - w/2, 14, w, 10);
+    ctx.save();
+    ctx.shadowColor = '#ff2f6b';
+    ctx.shadowBlur = 10;
     ctx.fillStyle = '#ff5c5c';
     ctx.fillRect(W/2 - w/2, 14, w * (boss.hp/boss.maxHp), 10);
+    ctx.restore();
     ctx.strokeStyle = 'rgba(255,255,255,.5)';
     ctx.strokeRect(W/2 - w/2, 14, w, 10);
   }
 
   function drawWalls(){
+    const biome = currentBiome();
+    ctx.save();
+    ctx.shadowColor = biome.grid;
+    ctx.shadowBlur = 14;
     for (const w of walls){
-      const g = ctx.createLinearGradient(w.x, w.y, w.x, w.y + w.h);
-      g.addColorStop(0, '#c8ccd6');
-      g.addColorStop(1, '#7d8394');
-      ctx.fillStyle = g;
+      ctx.fillStyle = 'rgba(6,14,26,.55)';
       ctx.fillRect(w.x, w.y, w.w, w.h);
-      ctx.strokeStyle = 'rgba(0,0,0,.35)';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(w.x, w.y, w.w, w.h);
-      ctx.fillStyle = 'rgba(0,0,0,.25)';
-      for (let bx = w.x + 8; bx < w.x + w.w - 4; bx += 12){
-        ctx.fillRect(bx, w.y + 3, 3, w.h - 6);
+      ctx.strokeStyle = biome.grid;
+      ctx.lineWidth = 3;
+      ctx.strokeRect(w.x + 1.5, w.y + 1.5, w.w - 3, w.h - 3);
+      ctx.fillStyle = biome.grid;
+      for (let bx = w.x + 10; bx < w.x + w.w - 4; bx += 16){
+        ctx.fillRect(bx, w.y + w.h/2 - 1, 6, 2);
       }
     }
+    ctx.restore();
   }
 
   function drawPowerups(){
+    ctx.save();
+    ctx.shadowColor = '#baf6ff';
+    ctx.shadowBlur = 10;
     for (const p of powerups) drawEmoji(POWERUP_TYPES[p.type].emoji, p.x, p.y, 26);
+    ctx.restore();
   }
 
   function drawParticles(){
+    ctx.save();
+    ctx.shadowBlur = 9;
     for (const p of particles){
       ctx.globalAlpha = clamp(p.life / p.maxLife, 0, 1);
       ctx.fillStyle = p.color;
+      ctx.shadowColor = p.color;
       ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI*2); ctx.fill();
     }
+    ctx.restore();
     ctx.globalAlpha = 1;
   }
 
@@ -998,7 +1081,9 @@
     ctx.font = '700 32px Bangers, cursive';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#fff';
+    ctx.shadowColor = '#5ef1ff';
+    ctx.shadowBlur = 18;
+    ctx.fillStyle = '#eafcff';
     ctx.strokeStyle = 'rgba(0,0,0,.5)';
     ctx.lineWidth = 4;
     ctx.strokeText(bannerText, W/2, H/2 - 60);
