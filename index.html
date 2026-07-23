@@ -249,7 +249,7 @@
     <div class="overlay" id="startOverlay">
       <div class="bigemoji">🍟🚀</div>
       <h2>Air Fryer Blast</h2>
-      <p>Ta friteuse a pris son envol ! Dégomme les surgelés envahisseurs (frites, nuggets, pizzas, glaçons, donuts, pop-corn) avant qu'ils n'atteignent le fond du panier. Ramasse les bonus 🧈🌶️🥄🔪⚡💣❤️, change d'arme avec 🥖 (laser perçant) et 🌭 (missile à tête chercheuse), slalome entre les grilles 🧱, et survis aux boss 🛍️🧊🍕🍩🍿.</p>
+      <p>Ta friteuse a pris son envol ! Dégomme les mauvais aliments qui font grossir (frites, nuggets, pizzas, donuts, pop-corn) et les trucs qui pourraient te griller (glaçons, iceberg ❄️) avant qu'ils n'atteignent le fond du panier. Ramasse les brocolis 🥦 : leur couleur change l'évolution de tes tirs (bouclier, tir rapide, tir large, perçant, turbo, bombe, vie, laser, missile). Slalome entre les grilles 🧱, et survis aux boss 🛍️🧊🍕🍩🍿.</p>
       <p class="hint">Clavier : <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> ou <kbd>WASD</kbd> — tir automatique.<br>Tactile / souris : glisse le doigt sur l'écran, le vaisseau reste visible au-dessus.</p>
       <div class="modeSwitch">
         <button type="button" class="modeBtn" data-mode="normal">Normal</button>
@@ -434,12 +434,6 @@
     life:    { weight: 1 },
     laser:   { weight: 2 },
     missile: { weight: 1.6 },
-  };
-  // Weapon-swap pickups (laser, missile) key into this by the same name as their POWERUP_TYPES entry.
-  const WEAPON_TYPES = {
-    basic:   { emoji: '🧺' },
-    laser:   { emoji: '🥖' },
-    missile: { emoji: '🌭' },
   };
   const WEAPON_DURATION = 12000;
 
@@ -1166,13 +1160,6 @@
     ctx.restore();
   }
 
-  function drawEmoji(emoji, x, y, size){
-    ctx.font = size + 'px serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(emoji, x, y);
-  }
-
   // Hand-drawn, fully opaque enemy sprites — replaces emoji glyphs, which
   // depend on the platform's emoji font and can render washed-out/see-through.
   const ENEMY_DRAW = {
@@ -1667,209 +1654,54 @@
 
   // Hand-drawn, fully opaque pickup icons — same reasoning as ENEMY_DRAW:
   // emoji glyphs depend on the platform's emoji font and can render washed-out.
-  const POWERUP_DRAW = {
-    shield(p){
-      const r = 13;
-      ctx.save();
-      ctx.translate(p.x, p.y);
-      ctx.beginPath();
-      ctx.moveTo(0, -r);
-      ctx.quadraticCurveTo(r, -r * 0.6, r * 0.85, 0);
-      ctx.quadraticCurveTo(r * 0.7, r * 0.9, 0, r * 1.05);
-      ctx.quadraticCurveTo(-r * 0.7, r * 0.9, -r * 0.85, 0);
-      ctx.quadraticCurveTo(-r, -r * 0.6, 0, -r);
-      ctx.closePath();
-      const g = ctx.createLinearGradient(0, -r, 0, r);
-      g.addColorStop(0, '#fff3b0');
-      g.addColorStop(1, '#e6a83c');
-      ctx.fillStyle = g;
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(255,255,255,.6)';
-      ctx.lineWidth = 1.4;
-      ctx.stroke();
-      ctx.restore();
-    },
-
-    rapid(p){
-      const r = 13;
-      ctx.save();
-      ctx.translate(p.x, p.y);
-      ctx.rotate(-0.3);
-      ctx.beginPath();
-      ctx.moveTo(0, -r * 0.9);
-      ctx.quadraticCurveTo(r * 0.75, -r * 0.3, r * 0.5, r * 0.5);
-      ctx.quadraticCurveTo(r * 0.2, r * 1.05, -r * 0.1, r * 0.8);
-      ctx.quadraticCurveTo(-r * 0.6, r * 0.4, -r * 0.35, -r * 0.4);
-      ctx.closePath();
-      const g = ctx.createLinearGradient(-r, -r, r, r);
-      g.addColorStop(0, '#ff8a5c');
-      g.addColorStop(1, '#d92626');
-      ctx.fillStyle = g;
-      ctx.fill();
-      ctx.fillStyle = '#4a8f3c';
-      ctx.beginPath();
-      ctx.ellipse(0, -r * 0.9, r * 0.22, r * 0.16, 0.3, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    },
-
-    spread(p){
-      const r = 13;
-      ctx.save();
-      ctx.translate(p.x, p.y);
-      ctx.rotate(0.5);
-      ctx.beginPath();
-      ctx.ellipse(0, -r * 0.4, r * 0.55, r * 0.75, 0, 0, Math.PI * 2);
-      const g = ctx.createLinearGradient(0, -r, 0, 0);
-      g.addColorStop(0, '#f2f6fb');
-      g.addColorStop(1, '#b7c3d1');
-      ctx.fillStyle = g;
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(255,255,255,.5)';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-      ctx.fillStyle = '#c7d0da';
-      ctx.fillRect(-r * 0.1, r * 0.15, r * 0.2, r * 0.9);
-      ctx.restore();
-    },
-
-    pierce(p){
-      const r = 13;
-      ctx.save();
-      ctx.translate(p.x, p.y);
-      ctx.rotate(-0.6);
-      ctx.beginPath();
-      ctx.moveTo(-r * 0.15, -r * 1.05);
-      ctx.lineTo(r * 0.15, -r * 1.05);
-      ctx.lineTo(r * 0.15, r * 0.15);
-      ctx.lineTo(-r * 0.15, r * 0.15);
-      ctx.closePath();
-      const g = ctx.createLinearGradient(-r * 0.15, 0, r * 0.15, 0);
-      g.addColorStop(0, '#eef4fa');
-      g.addColorStop(1, '#9fb0c2');
-      ctx.fillStyle = g;
-      ctx.fill();
-      ctx.fillStyle = '#5a4632';
-      ctx.fillRect(-r * 0.18, r * 0.15, r * 0.36, r * 0.55);
-      ctx.restore();
-    },
-
-    turbo(p){
-      const r = 13;
-      ctx.save();
-      ctx.translate(p.x, p.y);
-      ctx.beginPath();
-      ctx.moveTo(r * 0.1, -r * 1.05);
-      ctx.lineTo(-r * 0.55, r * 0.15);
-      ctx.lineTo(-r * 0.05, r * 0.15);
-      ctx.lineTo(-r * 0.25, r * 1.05);
-      ctx.lineTo(r * 0.6, -r * 0.1);
-      ctx.lineTo(r * 0.1, -r * 0.1);
-      ctx.closePath();
-      const g = ctx.createLinearGradient(0, -r, 0, r);
-      g.addColorStop(0, '#fff7c2');
-      g.addColorStop(1, '#ffcc3d');
-      ctx.fillStyle = g;
-      ctx.fill();
-      ctx.restore();
-    },
-
-    bomb(p){
-      const r = 13;
-      ctx.save();
-      ctx.translate(p.x, p.y);
-      ctx.beginPath();
-      ctx.arc(0, r * 0.15, r * 0.78, 0, Math.PI * 2);
-      const g = ctx.createRadialGradient(-r * 0.25, -r * 0.1, r * 0.1, 0, r * 0.15, r * 0.9);
-      g.addColorStop(0, '#5a6472');
-      g.addColorStop(1, '#14181f');
-      ctx.fillStyle = g;
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(255,255,255,.25)';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-      ctx.strokeStyle = '#c9a165';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(r * 0.2, -r * 0.55);
-      ctx.quadraticCurveTo(r * 0.55, -r * 0.9, r * 0.35, -r * 1.15);
-      ctx.stroke();
-      ctx.fillStyle = '#ffb238';
-      ctx.beginPath();
-      ctx.arc(r * 0.35, -r * 1.15, r * 0.16, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    },
-
-    life(p){
-      const r = 13;
-      ctx.save();
-      ctx.translate(p.x, p.y);
-      ctx.beginPath();
-      ctx.moveTo(0, r * 0.85);
-      ctx.bezierCurveTo(-r * 1.1, r * 0.05, -r * 0.85, -r * 0.95, 0, -r * 0.35);
-      ctx.bezierCurveTo(r * 0.85, -r * 0.95, r * 1.1, r * 0.05, 0, r * 0.85);
-      ctx.closePath();
-      const g = ctx.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r * 1.1);
-      g.addColorStop(0, '#ff8fa8');
-      g.addColorStop(1, '#e0264f');
-      ctx.fillStyle = g;
-      ctx.fill();
-      ctx.restore();
-    },
-
-    laser(p){
-      const r = 13;
-      ctx.save();
-      ctx.translate(p.x, p.y);
-      ctx.rotate(-0.5);
-      ctx.beginPath();
-      ctx.roundRect(-r * 0.35, -r * 1.05, r * 0.7, r * 2.1, r * 0.35);
-      const g = ctx.createLinearGradient(-r * 0.35, 0, r * 0.35, 0);
-      g.addColorStop(0, '#f6e2b0');
-      g.addColorStop(0.5, '#e8c274');
-      g.addColorStop(1, '#c99a4a');
-      ctx.fillStyle = g;
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(90,60,20,.5)';
-      ctx.lineWidth = 1;
-      for (const dy of [-r * 0.5, 0, r * 0.5]){
-        ctx.beginPath();
-        ctx.moveTo(-r * 0.3, dy);
-        ctx.lineTo(r * 0.3, dy - r * 0.15);
-        ctx.stroke();
-      }
-      ctx.restore();
-    },
-
-    missile(p){
-      const r = 13;
-      ctx.save();
-      ctx.translate(p.x, p.y);
-      ctx.rotate(-0.5);
-      ctx.beginPath();
-      ctx.roundRect(-r * 0.4, -r * 1.05, r * 0.8, r * 2.1, r * 0.4);
-      const bunG = ctx.createLinearGradient(0, -r, 0, r);
-      bunG.addColorStop(0, '#f2c27a');
-      bunG.addColorStop(1, '#c98a3d');
-      ctx.fillStyle = bunG;
-      ctx.fill();
-      ctx.beginPath();
-      ctx.roundRect(-r * 0.24, -r * 0.85, r * 0.48, r * 1.7, r * 0.24);
-      const dogG = ctx.createLinearGradient(0, -r, 0, r);
-      dogG.addColorStop(0, '#c9573d');
-      dogG.addColorStop(1, '#8f2d1e');
-      ctx.fillStyle = dogG;
-      ctx.fill();
-      ctx.restore();
-    },
+  // Every bonus is a broccoli floret — only the color tells them apart,
+  // matching the "healthy pickup vs. junk-food enemy" theme.
+  const BROCCOLI_COLORS = {
+    shield:  { top: '#bdf3ff', bottom: '#2f9fd6' },
+    rapid:   { top: '#ff9d8f', bottom: '#c62a1f' },
+    spread:  { top: '#bdffce', bottom: '#2e8f4a' },
+    pierce:  { top: '#f2f7fb', bottom: '#8fa0b3' },
+    turbo:   { top: '#fff3b0', bottom: '#e0b400' },
+    bomb:    { top: '#c9a8ff', bottom: '#3a2159' },
+    life:    { top: '#ffc2d9', bottom: '#e0356f' },
+    laser:   { top: '#ffc2ef', bottom: '#c0268f' },
+    missile: { top: '#ffcf9e', bottom: '#d9611f' },
   };
+  function drawBroccoli(x, y, r, type){
+    const c = BROCCOLI_COLORS[type] || BROCCOLI_COLORS.spread;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.fillStyle = '#d9dba0';
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.2, r * 0.35);
+    ctx.lineTo(r * 0.2, r * 0.35);
+    ctx.lineTo(r * 0.13, r * 1.05);
+    ctx.lineTo(-r * 0.13, r * 1.05);
+    ctx.closePath();
+    ctx.fill();
+    const puffs = [
+      [0, -r * 0.5, r * 0.52], [-r * 0.44, -r * 0.18, r * 0.44], [r * 0.44, -r * 0.18, r * 0.44],
+      [-r * 0.2, r * 0.18, r * 0.4], [r * 0.2, r * 0.18, r * 0.4],
+    ];
+    for (const [dx, dy, pr] of puffs){
+      ctx.beginPath();
+      ctx.arc(dx, dy, pr, 0, Math.PI * 2);
+      const g = ctx.createRadialGradient(dx - pr * 0.3, dy - pr * 0.3, pr * 0.1, dx, dy, pr * 1.1);
+      g.addColorStop(0, c.top);
+      g.addColorStop(1, c.bottom);
+      ctx.fillStyle = g;
+      ctx.fill();
+    }
+    ctx.restore();
+  }
 
   function drawPowerups(){
     ctx.save();
-    ctx.shadowColor = '#baf6ff';
-    ctx.shadowBlur = 10;
-    for (const p of powerups) (POWERUP_DRAW[p.type] || POWERUP_DRAW.life)(p);
+    for (const p of powerups) {
+      ctx.shadowColor = (BROCCOLI_COLORS[p.type] || BROCCOLI_COLORS.spread).bottom;
+      ctx.shadowBlur = 10;
+      drawBroccoli(p.x, p.y, 13, p.type);
+    }
     ctx.restore();
   }
 
@@ -1888,12 +1720,12 @@
 
   function drawBuffs(){
     const buffs = [];
-    if (shieldActive) buffs.push({ emoji: '🧈', frac: 1 });
-    if (rapidTimer > 0) buffs.push({ emoji: '🌶️', frac: rapidTimer / 9000 });
-    if (pierceTimer > 0) buffs.push({ emoji: '🔪', frac: pierceTimer / 9000 });
-    if (turboTimer > 0) buffs.push({ emoji: '⚡', frac: turboTimer / 9000 });
-    if (spreadLevel > 0) buffs.push({ emoji: '🥄', frac: 1, count: spreadLevel });
-    if (weaponTimer > 0) buffs.push({ emoji: WEAPON_TYPES[activeWeapon].emoji, frac: weaponTimer / WEAPON_DURATION });
+    if (shieldActive) buffs.push({ type: 'shield', frac: 1 });
+    if (rapidTimer > 0) buffs.push({ type: 'rapid', frac: rapidTimer / 9000 });
+    if (pierceTimer > 0) buffs.push({ type: 'pierce', frac: pierceTimer / 9000 });
+    if (turboTimer > 0) buffs.push({ type: 'turbo', frac: turboTimer / 9000 });
+    if (spreadLevel > 0) buffs.push({ type: 'spread', frac: 1, count: spreadLevel });
+    if (weaponTimer > 0) buffs.push({ type: activeWeapon, frac: weaponTimer / WEAPON_DURATION });
     if (!buffs.length) return;
     ctx.save();
     const y = 46, size = 14, gap = 32;
@@ -1911,7 +1743,7 @@
       ctx.arc(x, y, size, -Math.PI/2, -Math.PI/2 + Math.PI*2*clamp(b.frac, 0, 1));
       ctx.stroke();
       ctx.shadowBlur = 0;
-      drawEmoji(b.emoji, x, y, 16);
+      drawBroccoli(x, y, 9, b.type);
       if (b.count > 1) {
         ctx.font = '700 10px Fredoka, sans-serif';
         ctx.fillStyle = '#fff';
