@@ -213,7 +213,7 @@
     <div class="overlay" id="startOverlay">
       <div class="bigemoji">🍟🚀</div>
       <h2>Air Fryer Blast</h2>
-      <p>Ta friteuse a pris son envol ! Dégomme les surgelés envahisseurs (frites, nuggets, pizzas, glaçons, donuts, pop-corn) avant qu'ils n'atteignent le fond du panier. Ramasse les bonus 🧈🌶️🥄🔪⚡💣❤️, change d'arme avec 🥖 (laser perçant) et 🌭 (missile à tête chercheuse), slalome entre les grilles 🧱, et survis aux boss 🛍️🧊🍕.</p>
+      <p>Ta friteuse a pris son envol ! Dégomme les surgelés envahisseurs (frites, nuggets, pizzas, glaçons, donuts, pop-corn) avant qu'ils n'atteignent le fond du panier. Ramasse les bonus 🧈🌶️🥄🔪⚡💣❤️, change d'arme avec 🥖 (laser perçant) et 🌭 (missile à tête chercheuse), slalome entre les grilles 🧱, et survis aux boss 🛍️🧊🍕🍩🍿.</p>
       <p class="hint">Clavier : <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> ou <kbd>WASD</kbd> — tir automatique.<br>Tactile / souris : glisse le doigt sur l'écran, le vaisseau reste visible au-dessus.</p>
       <button class="primary" id="startBtn">Décoller</button>
     </div>
@@ -343,13 +343,13 @@
 
   // ---------- enemy types ----------
   const ENEMY_TYPES = {
-    frite:   { emoji: '🍟', hp: 1, r: 15, speed: 1.6, points: 10, pattern: 'zigzag' },
-    nugget:  { emoji: '🍗', hp: 2, r: 16, speed: 1.15, points: 20, pattern: 'straight', shoots: true },
-    pizza:   { emoji: '🍕', hp: 3, r: 18, speed: 0.85, points: 35, pattern: 'sine', shoots: true, spreadShot: true },
-    glacon:  { emoji: '🧊', hp: 1, r: 14, speed: 2.2, points: 15, pattern: 'erratic' },
-    donut:   { emoji: '🍩', hp: 3, r: 17, speed: 1.0, points: 28, pattern: 'homing', shoots: true },
-    popcorn: { emoji: '🍿', hp: 2, r: 14, speed: 1.9, points: 18, pattern: 'zigzag', splits: true },
-    kernel:  { emoji: '🌽', hp: 1, r: 9,  speed: 2.4, points: 8,  pattern: 'erratic' },
+    frite:   { hp: 1, r: 15, speed: 1.6, points: 10, pattern: 'zigzag' },
+    nugget:  { hp: 2, r: 16, speed: 1.15, points: 20, pattern: 'straight', shoots: true },
+    pizza:   { hp: 3, r: 18, speed: 0.85, points: 35, pattern: 'sine', shoots: true, spreadShot: true },
+    glacon:  { hp: 1, r: 14, speed: 2.2, points: 15, pattern: 'erratic' },
+    donut:   { hp: 3, r: 17, speed: 1.0, points: 28, pattern: 'homing', shoots: true },
+    popcorn: { hp: 2, r: 14, speed: 1.9, points: 18, pattern: 'zigzag', splits: true },
+    kernel:  { hp: 1, r: 9,  speed: 2.4, points: 8,  pattern: 'erratic' },
   };
   const POWERUP_TYPES = {
     shield:  { emoji: '🧈', weight: 3 },
@@ -459,15 +459,15 @@
     enemies.push(makeEnemy(typeKey, rand(30, W - 30), -30));
   }
 
-  const BOSS_KINDS = ['sac', 'iceberg', 'mega'];
+  const BOSS_KINDS = ['sac', 'iceberg', 'mega', 'spiral', 'popper'];
   function spawnBoss(){
     const kind = BOSS_KINDS[Math.floor(wave / 5 - 1) % BOSS_KINDS.length];
-    const hpMul = kind === 'iceberg' ? 1.15 : kind === 'mega' ? 0.9 : 1;
+    const hpMul = kind === 'iceberg' ? 1.15 : kind === 'mega' ? 0.9 : kind === 'popper' ? 0.85 : kind === 'spiral' ? 1.05 : 1;
     const hp = Math.round((40 + wave * 12) * hpMul);
-    const r = kind === 'iceberg' ? 38 : kind === 'mega' ? 40 : 34;
+    const r = kind === 'iceberg' ? 38 : kind === 'mega' ? 40 : kind === 'popper' ? 40 : kind === 'spiral' ? 36 : 34;
     boss = {
       kind, x: W/2, y: -60, r, hp, maxHp: hp,
-      t: 0, dir: 1, shootTimer: 800, spawnTimer: 2800,
+      t: 0, dir: 1, shootTimer: 800, spawnTimer: 2800, jitterTimer: 900, spiralAngle: 0,
       entering: true,
     };
   }
@@ -832,16 +832,29 @@
       if (boss.y >= 90) boss.entering = false;
     } else {
       boss.t += dt;
-      const moveSpeed = boss.kind === 'iceberg' ? 1.6 : 1.1;
+      const moveSpeed = boss.kind === 'iceberg' ? 1.6 : boss.kind === 'popper' ? 2.2 : boss.kind === 'spiral' ? 0.7 : 1.1;
       boss.x += boss.dir * moveSpeed * dtScale;
       if (boss.x < 50) boss.dir = 1;
       if (boss.x > W - 50) boss.dir = -1;
+
+      if (boss.kind === 'popper') {
+        boss.jitterTimer -= dt;
+        if (boss.jitterTimer <= 0) { boss.dir *= -1; boss.jitterTimer = rand(400, 900); }
+      }
 
       if (boss.kind === 'mega') {
         boss.spawnTimer -= dt;
         if (boss.spawnTimer <= 0 && enemies.length < 8) {
           enemies.push(makeEnemy('nugget', boss.x, boss.y + boss.r, { dir: 1, shootTimer: rand(900, 1500) }));
           boss.spawnTimer = rand(2600, 3400);
+        }
+      } else if (boss.kind === 'popper') {
+        boss.spawnTimer -= dt;
+        if (boss.spawnTimer <= 0 && enemies.length < 10) {
+          for (const dx of [-1, 1]) {
+            enemies.push(makeEnemy('kernel', clamp(boss.x + dx * boss.r * 0.7, 10, W - 10), boss.y + boss.r * 0.6));
+          }
+          boss.spawnTimer = rand(1500, 2200);
         }
       }
 
@@ -862,6 +875,22 @@
             spawnEnemyBullet({ x: boss.x, y: boss.y + boss.r, vx: Math.sin(a)*speed, vy: Math.cos(a)*speed, r: 5 });
           }
           boss.shootTimer = rand(1600, 2200);
+        } else if (boss.kind === 'spiral') {
+          const speed = Math.min(3 + wave * 0.03, 5.5);
+          boss.spiralAngle += 0.34;
+          for (const off of [0, Math.PI]) {
+            const a = boss.spiralAngle + off;
+            spawnEnemyBullet({ x: boss.x, y: boss.y, vx: Math.sin(a)*speed, vy: Math.cos(a)*speed, r: 5 });
+          }
+          boss.shootTimer = Math.max(220 - wave * 2, 110);
+        } else if (boss.kind === 'popper') {
+          const speed = Math.min(2.4 + wave * 0.03, 5);
+          const n = 5 + Math.min(Math.floor(wave / 8), 4);
+          for (let k = 0; k < n; k++){
+            const a = rand(-1.1, 1.1);
+            spawnEnemyBullet({ x: boss.x, y: boss.y + boss.r * 0.4, vx: Math.sin(a)*speed, vy: Math.cos(a)*speed, r: 5 });
+          }
+          boss.shootTimer = rand(900, 1400);
         } else {
           const speed = Math.min(2.8 + wave * 0.04, 5);
           const angles = wave >= 10 ? [-0.4, -0.2, 0, 0.2, 0.4] : [-0.3, 0, 0.3];
@@ -1077,6 +1106,195 @@
     ctx.restore();
   }
 
+  // Hand-drawn, fully opaque enemy sprites — replaces emoji glyphs, which
+  // depend on the platform's emoji font and can render washed-out/see-through.
+  const ENEMY_DRAW = {
+    frite(e){
+      const r = e.r;
+      ctx.save();
+      ctx.translate(e.x, e.y);
+      const cw = r * 1.5, ch = r * 1.3;
+      ctx.beginPath();
+      ctx.moveTo(-cw * 0.34, ch * 0.42);
+      ctx.lineTo(cw * 0.34, ch * 0.42);
+      ctx.lineTo(cw * 0.26, -ch * 0.16);
+      ctx.lineTo(-cw * 0.26, -ch * 0.16);
+      ctx.closePath();
+      const cartonG = ctx.createLinearGradient(0, -ch * 0.16, 0, ch * 0.42);
+      cartonG.addColorStop(0, '#ff6153');
+      cartonG.addColorStop(1, '#c2281c');
+      ctx.fillStyle = cartonG;
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,.3)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,.22)';
+      ctx.fillRect(-cw * 0.22, -ch * 0.02, cw * 0.44, ch * 0.08);
+
+      const fryG = ctx.createLinearGradient(0, -ch * 1.05, 0, -ch * 0.14);
+      fryG.addColorStop(0, '#ffe9a8');
+      fryG.addColorStop(1, '#f5b23a');
+      ctx.fillStyle = fryG;
+      [-cw * 0.22, -cw * 0.02, cw * 0.2].forEach((dx, i) => {
+        ctx.save();
+        ctx.translate(dx, -ch * 0.16);
+        ctx.rotate((i - 1) * 0.14);
+        ctx.beginPath();
+        ctx.roundRect(-r * 0.11, -ch * 0.9, r * 0.22, ch * 0.9, 3);
+        ctx.fill();
+        ctx.restore();
+      });
+      ctx.restore();
+    },
+
+    nugget(e){
+      const r = e.r;
+      ctx.save();
+      ctx.translate(e.x, e.y);
+      ctx.beginPath();
+      const n = 10;
+      for (let i = 0; i <= n; i++){
+        const a = (i / n) * Math.PI * 2;
+        const wob = 1 + 0.14 * Math.sin(a * 3 + e.phase) + 0.07 * Math.cos(a * 5 - e.phase);
+        const x = Math.cos(a) * r * wob, y = Math.sin(a) * r * wob * 0.86;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      const g = ctx.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.15, 0, 0, r * 1.15);
+      g.addColorStop(0, '#f6cf7a');
+      g.addColorStop(1, '#9a5a1e');
+      ctx.fillStyle = g;
+      ctx.fill();
+      ctx.fillStyle = 'rgba(120,66,14,.55)';
+      [[-r * 0.3, -r * 0.1], [r * 0.15, r * 0.25], [r * 0.3, -r * 0.3]].forEach(([dx, dy]) => {
+        ctx.beginPath(); ctx.arc(dx, dy, r * 0.09, 0, Math.PI * 2); ctx.fill();
+      });
+      ctx.restore();
+    },
+
+    pizza(e){
+      const r = e.r;
+      ctx.save();
+      ctx.translate(e.x, e.y);
+      ctx.beginPath();
+      ctx.moveTo(0, -r * 1.1);
+      ctx.lineTo(r * 0.85, r * 0.8);
+      ctx.quadraticCurveTo(0, r * 1.05, -r * 0.85, r * 0.8);
+      ctx.closePath();
+      const g = ctx.createLinearGradient(0, -r, 0, r);
+      g.addColorStop(0, '#ff8a3d');
+      g.addColorStop(1, '#e2451f');
+      ctx.fillStyle = g;
+      ctx.fill();
+      ctx.strokeStyle = '#f6c667';
+      ctx.lineWidth = r * 0.22;
+      ctx.beginPath();
+      ctx.moveTo(r * 0.78, r * 0.7);
+      ctx.quadraticCurveTo(0, r * 1.0, -r * 0.78, r * 0.7);
+      ctx.stroke();
+      ctx.fillStyle = '#8f2016';
+      [[-r * 0.18, -r * 0.05], [r * 0.12, r * 0.15], [-r * 0.02, r * 0.4]].forEach(([dx, dy]) => {
+        ctx.beginPath(); ctx.arc(dx, dy, r * 0.16, 0, Math.PI * 2); ctx.fill();
+      });
+      ctx.restore();
+    },
+
+    glacon(e){
+      const r = e.r;
+      ctx.save();
+      ctx.translate(e.x, e.y);
+      ctx.rotate(0.2);
+      ctx.beginPath();
+      ctx.roundRect(-r * 0.85, -r * 0.85, r * 1.7, r * 1.7, r * 0.3);
+      const g = ctx.createLinearGradient(-r, -r, r, r);
+      g.addColorStop(0, '#eafcff');
+      g.addColorStop(0.5, '#a9e8ff');
+      g.addColorStop(1, '#5ec8ea');
+      ctx.fillStyle = g;
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,.8)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,.9)';
+      ctx.lineWidth = r * 0.16;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.4, -r * 0.5);
+      ctx.lineTo(r * 0.1, r * 0.15);
+      ctx.stroke();
+      ctx.restore();
+    },
+
+    donut(e){
+      const r = e.r;
+      ctx.save();
+      ctx.translate(e.x, e.y);
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      const g = ctx.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r * 1.05);
+      g.addColorStop(0, '#ffb0d8');
+      g.addColorStop(1, '#e8578f');
+      ctx.fillStyle = g;
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 0.38, 0, Math.PI * 2);
+      ctx.fillStyle = '#0b1420';
+      ctx.fill();
+      const sprinkleColors = ['#ffe27a', '#6bff9d', '#7fe0ff', '#fff'];
+      for (let i = 0; i < 6; i++){
+        const a = (i / 6) * Math.PI * 2 + e.phase;
+        const sx = Math.cos(a) * r * 0.68, sy = Math.sin(a) * r * 0.68;
+        ctx.save();
+        ctx.translate(sx, sy);
+        ctx.rotate(a);
+        ctx.fillStyle = sprinkleColors[i % sprinkleColors.length];
+        ctx.fillRect(-r * 0.09, -r * 0.02, r * 0.18, r * 0.04);
+        ctx.restore();
+      }
+      ctx.restore();
+    },
+
+    popcorn(e){
+      const r = e.r;
+      ctx.save();
+      ctx.translate(e.x, e.y);
+      const puffs = [
+        [0, -r * 0.35, r * 0.62], [-r * 0.5, r * 0.05, r * 0.55], [r * 0.5, r * 0.05, r * 0.55],
+        [-r * 0.2, r * 0.5, r * 0.5], [r * 0.22, r * 0.5, r * 0.5],
+      ];
+      for (const [dx, dy, pr] of puffs){
+        ctx.beginPath();
+        ctx.arc(dx, dy, pr, 0, Math.PI * 2);
+        const g = ctx.createRadialGradient(dx - pr * 0.3, dy - pr * 0.3, pr * 0.1, dx, dy, pr * 1.1);
+        g.addColorStop(0, '#fffef2');
+        g.addColorStop(1, '#f3dd9a');
+        ctx.fillStyle = g;
+        ctx.fill();
+      }
+      ctx.restore();
+    },
+
+    kernel(e){
+      const r = e.r;
+      ctx.save();
+      ctx.translate(e.x, e.y);
+      ctx.rotate(e.phase * 0.3);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, r * 0.75, r, 0, 0, Math.PI * 2);
+      const g = ctx.createLinearGradient(0, -r, 0, r);
+      g.addColorStop(0, '#fff2b0');
+      g.addColorStop(1, '#f2b23c');
+      ctx.fillStyle = g;
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(150,90,10,.5)';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(0, -r * 0.6); ctx.lineTo(0, r * 0.6);
+      ctx.stroke();
+      ctx.restore();
+    },
+  };
+
   function drawPlayer(){
     if (invulnTimer > 0 && Math.floor(invulnTimer/100) % 2 === 0) return;
     const glowColor = turboTimer > 0 ? '#fff35e' : '#5ef1ff';
@@ -1195,8 +1413,7 @@
     ctx.shadowColor = '#ff2f8f';
     ctx.shadowBlur = 8;
     for (const e of enemies){
-      drawBadge(e.x, e.y, e.r * 0.94, '#ff2f8f');
-      drawEmoji(e.def.emoji, e.x, e.y, e.r*2);
+      (ENEMY_DRAW[e.type] || ENEMY_DRAW.frite)(e);
       if (e.hp < e.maxHp) {
         const w = e.r*2;
         ctx.shadowBlur = 0;
@@ -1210,15 +1427,144 @@
     ctx.restore();
   }
 
-  const BOSS_EMOJI = { sac: '🛍️', iceberg: '🧊', mega: '🍕' };
-  const BOSS_GLOW = { sac: '#ff2f8f', iceberg: '#5ef1ff', mega: '#ff8a3d' };
+  const BOSS_GLOW = { sac: '#ff2f8f', iceberg: '#5ef1ff', mega: '#ff8a3d', spiral: '#ff8adf', popper: '#ffe27a' };
+  const BOSS_DRAW = {
+    sac(b){
+      const r = b.r;
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.75, -r * 0.5);
+      ctx.lineTo(r * 0.75, -r * 0.5);
+      ctx.lineTo(r * 0.95, r * 0.9);
+      ctx.lineTo(-r * 0.95, r * 0.9);
+      ctx.closePath();
+      const g = ctx.createLinearGradient(0, -r, 0, r);
+      g.addColorStop(0, '#ff6fb8');
+      g.addColorStop(1, '#b8206a');
+      ctx.fillStyle = g;
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,.4)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,.7)';
+      ctx.lineWidth = r * 0.09;
+      ctx.beginPath();
+      ctx.arc(-r * 0.32, -r * 0.5, r * 0.22, Math.PI, 0);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(r * 0.32, -r * 0.5, r * 0.22, Math.PI, 0);
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,.85)';
+      ctx.fillRect(-r * 0.3, -r * 0.05, r * 0.6, r * 0.32);
+      ctx.restore();
+    },
+
+    iceberg(b){
+      const r = b.r;
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      const spikes = 7;
+      ctx.beginPath();
+      for (let i = 0; i <= spikes; i++){
+        const a = (i / spikes) * Math.PI * 2;
+        const rr = r * (i % 2 === 0 ? 1 : 0.62);
+        const x = Math.cos(a) * rr, y = Math.sin(a) * rr;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      const g = ctx.createLinearGradient(-r, -r, r, r);
+      g.addColorStop(0, '#eafcff');
+      g.addColorStop(0.5, '#9fe3ff');
+      g.addColorStop(1, '#3fa8d6');
+      ctx.fillStyle = g;
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,.6)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.restore();
+    },
+
+    mega(b){
+      const r = b.r;
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      const g = ctx.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.2, 0, 0, r * 1.1);
+      g.addColorStop(0, '#ffcf7a');
+      g.addColorStop(1, '#d94e1e');
+      ctx.fillStyle = g;
+      ctx.fill();
+      ctx.strokeStyle = '#f6c667';
+      ctx.lineWidth = r * 0.14;
+      ctx.stroke();
+      ctx.fillStyle = '#7a1a12';
+      const n = 6;
+      for (let i = 0; i < n; i++){
+        const a = (i / n) * Math.PI * 2 + 0.3;
+        const dx = Math.cos(a) * r * 0.55, dy = Math.sin(a) * r * 0.55;
+        ctx.beginPath(); ctx.arc(dx, dy, r * 0.14, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.restore();
+    },
+
+    spiral(b){
+      const r = b.r;
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.rotate((b.spiralAngle || 0) * 0.3);
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      const g = ctx.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r * 1.05);
+      g.addColorStop(0, '#ffe0f2');
+      g.addColorStop(1, '#d6469c');
+      ctx.fillStyle = g;
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 0.4, 0, Math.PI * 2);
+      ctx.fillStyle = '#0b1420';
+      ctx.fill();
+      const sprinkleColors = ['#ffe27a', '#6bff9d', '#7fe0ff', '#fff'];
+      for (let i = 0; i < 8; i++){
+        const a = (i / 8) * Math.PI * 2;
+        const sx = Math.cos(a) * r * 0.7, sy = Math.sin(a) * r * 0.7;
+        ctx.save();
+        ctx.translate(sx, sy);
+        ctx.rotate(a);
+        ctx.fillStyle = sprinkleColors[i % sprinkleColors.length];
+        ctx.fillRect(-r * 0.1, -r * 0.025, r * 0.2, r * 0.05);
+        ctx.restore();
+      }
+      ctx.restore();
+    },
+
+    popper(b){
+      const r = b.r;
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      const puffs = [
+        [0, -r * 0.4, r * 0.62], [-r * 0.55, 0, r * 0.55], [r * 0.55, 0, r * 0.55],
+        [-r * 0.28, r * 0.5, r * 0.5], [r * 0.3, r * 0.5, r * 0.5], [0, r * 0.15, r * 0.5],
+      ];
+      for (const [dx, dy, pr] of puffs){
+        ctx.beginPath();
+        ctx.arc(dx, dy, pr, 0, Math.PI * 2);
+        const g = ctx.createRadialGradient(dx - pr * 0.3, dy - pr * 0.3, pr * 0.1, dx, dy, pr * 1.1);
+        g.addColorStop(0, '#fffef2');
+        g.addColorStop(1, '#f3dd9a');
+        ctx.fillStyle = g;
+        ctx.fill();
+      }
+      ctx.restore();
+    },
+  };
   function drawBoss(){
     if (!boss) return;
     ctx.save();
     ctx.shadowColor = BOSS_GLOW[boss.kind] || '#ff2f8f';
     ctx.shadowBlur = 22;
-    drawBadge(boss.x, boss.y, boss.r * 0.92, BOSS_GLOW[boss.kind] || '#ff2f8f');
-    drawEmoji(BOSS_EMOJI[boss.kind] || '🛍️', boss.x, boss.y, boss.r * 2);
+    (BOSS_DRAW[boss.kind] || BOSS_DRAW.sac)(boss);
     ctx.restore();
     const w = 200;
     ctx.fillStyle = 'rgba(0,0,0,.45)';
