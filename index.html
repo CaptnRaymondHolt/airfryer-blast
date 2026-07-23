@@ -406,9 +406,9 @@
     const c = Math.cos(ang), s = Math.sin(ang);
     return { x: x*c - y*s, y: x*s + y*c };
   }
-  const MAX_ENEMY_BULLETS = 70;
+  function maxEnemyBullets(){ return mode === 'extreme' ? 130 : 70; }
   function spawnEnemyBullet(b){
-    if (enemyBullets.length >= MAX_ENEMY_BULLETS) return;
+    if (enemyBullets.length >= maxEnemyBullets()) return;
     const mul = cfg().bulletSpeedMul;
     b.vx *= mul; b.vy *= mul;
     enemyBullets.push(b);
@@ -425,15 +425,15 @@
     kernel:  { hp: 1, r: 9,  speed: 2.4, points: 8,  pattern: 'erratic' },
   };
   const POWERUP_TYPES = {
-    shield:  { emoji: '🧈', weight: 3 },
-    rapid:   { emoji: '🌶️', weight: 3 },
-    spread:  { emoji: '🥄', weight: 3 },
-    pierce:  { emoji: '🔪', weight: 2 },
-    turbo:   { emoji: '⚡', weight: 2 },
-    bomb:    { emoji: '💣', weight: 1.5 },
-    life:    { emoji: '❤️', weight: 1 },
-    laser:   { emoji: '🥖', weight: 2 },
-    missile: { emoji: '🌭', weight: 1.6 },
+    shield:  { weight: 3 },
+    rapid:   { weight: 3 },
+    spread:  { weight: 3 },
+    pierce:  { weight: 2 },
+    turbo:   { weight: 2 },
+    bomb:    { weight: 1.5 },
+    life:    { weight: 1 },
+    laser:   { weight: 2 },
+    missile: { weight: 1.6 },
   };
   // Weapon-swap pickups (laser, missile) key into this by the same name as their POWERUP_TYPES entry.
   const WEAPON_TYPES = {
@@ -828,8 +828,10 @@
 
   function enemyShoot(e){
     const speed = Math.min(3 + wave * 0.08, 6.5);
+    const bombard = mode === 'extreme';
     if (e.def.spreadShot) {
-      const angles = wave >= 12 ? [-0.4, -0.2, 0, 0.2, 0.4] : [-0.3, 0, 0.3];
+      let angles = wave >= 12 ? [-0.4, -0.2, 0, 0.2, 0.4] : [-0.3, 0, 0.3];
+      if (bombard) angles = wave >= 12 ? [-0.5, -0.32, -0.16, 0, 0.16, 0.32, 0.5] : [-0.42, -0.2, 0, 0.2, 0.42];
       for (const a of angles){
         spawnEnemyBullet({ x: e.x, y: e.y, vx: Math.sin(a)*speed, vy: Math.cos(a)*speed, r: 5 });
       }
@@ -837,7 +839,8 @@
       const dx = player.x - e.x, dy = player.y - e.y;
       const len = Math.max(1, Math.hypot(dx, dy));
       const dirx = dx/len, diry = dy/len;
-      const count = wave >= 15 ? 3 : wave >= 6 ? 2 : 1;
+      let count = wave >= 15 ? 3 : wave >= 6 ? 2 : 1;
+      if (bombard) count = Math.min(count + 1, 4);
       for (let k = 0; k < count; k++){
         const off = (k - (count-1)/2) * 0.22;
         const v = rotateVec(dirx, diry, off);
@@ -933,9 +936,10 @@
 
       boss.shootTimer -= dt;
       if (boss.shootTimer <= 0) {
+        const bombard = mode === 'extreme';
         if (boss.kind === 'iceberg') {
           const speed = Math.min(3 + wave * 0.04, 5.5);
-          const n = Math.min(8 + Math.floor(wave / 10) * 2, 14);
+          const n = Math.min(8 + Math.floor(wave / 10) * 2, 14) + (bombard ? 4 : 0);
           for (let k = 0; k < n; k++){
             const a = (Math.PI * 2 / n) * k;
             spawnEnemyBullet({ x: boss.x, y: boss.y, vx: Math.sin(a)*speed, vy: Math.cos(a)*speed, r: 5 });
@@ -943,7 +947,8 @@
           boss.shootTimer = fireInterval(rand(1700, 2300));
         } else if (boss.kind === 'mega') {
           const speed = Math.min(2.6 + wave * 0.03, 5);
-          const angles = wave >= 15 ? [-0.6,-0.4,-0.2,0,0.2,0.4,0.6] : [-0.5, -0.25, 0, 0.25, 0.5];
+          let angles = wave >= 15 ? [-0.6,-0.4,-0.2,0,0.2,0.4,0.6] : [-0.5, -0.25, 0, 0.25, 0.5];
+          if (bombard) angles = [-0.75, ...angles, 0.75];
           for (const a of angles){
             spawnEnemyBullet({ x: boss.x, y: boss.y + boss.r, vx: Math.sin(a)*speed, vy: Math.cos(a)*speed, r: 5 });
           }
@@ -951,14 +956,15 @@
         } else if (boss.kind === 'spiral') {
           const speed = Math.min(3 + wave * 0.03, 5.5);
           boss.spiralAngle += 0.34;
-          for (const off of [0, Math.PI]) {
+          const arms = bombard ? [0, Math.PI/2, Math.PI, Math.PI*1.5] : [0, Math.PI];
+          for (const off of arms) {
             const a = boss.spiralAngle + off;
             spawnEnemyBullet({ x: boss.x, y: boss.y, vx: Math.sin(a)*speed, vy: Math.cos(a)*speed, r: 5 });
           }
           boss.shootTimer = fireInterval(Math.max(220 - wave * 2, 110));
         } else if (boss.kind === 'popper') {
           const speed = Math.min(2.4 + wave * 0.03, 5);
-          const n = 5 + Math.min(Math.floor(wave / 8), 4);
+          const n = 5 + Math.min(Math.floor(wave / 8), 4) + (bombard ? 3 : 0);
           for (let k = 0; k < n; k++){
             const a = rand(-1.1, 1.1);
             spawnEnemyBullet({ x: boss.x, y: boss.y + boss.r * 0.4, vx: Math.sin(a)*speed, vy: Math.cos(a)*speed, r: 5 });
@@ -966,7 +972,8 @@
           boss.shootTimer = fireInterval(rand(900, 1400));
         } else {
           const speed = Math.min(2.8 + wave * 0.04, 5);
-          const angles = wave >= 10 ? [-0.4, -0.2, 0, 0.2, 0.4] : [-0.3, 0, 0.3];
+          let angles = wave >= 10 ? [-0.4, -0.2, 0, 0.2, 0.4] : [-0.3, 0, 0.3];
+          if (bombard) angles = [-0.55, ...angles, 0.55];
           for (const a of angles){
             spawnEnemyBullet({ x: boss.x, y: boss.y + boss.r, vx: Math.sin(a)*speed, vy: Math.cos(a)*speed, r: 5 });
           }
@@ -1164,19 +1171,6 @@
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(emoji, x, y);
-  }
-
-  // Solid disc behind an emoji sprite so its glyph reads as fully opaque
-  // instead of letting the grid/background show through its transparent parts.
-  function drawBadge(x, y, r, glowColor){
-    ctx.save();
-    ctx.shadowColor = glowColor;
-    ctx.shadowBlur = 10;
-    ctx.fillStyle = '#0b1420';
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI*2);
-    ctx.fill();
-    ctx.restore();
   }
 
   // Hand-drawn, fully opaque enemy sprites — replaces emoji glyphs, which
@@ -1671,14 +1665,211 @@
     ctx.restore();
   }
 
+  // Hand-drawn, fully opaque pickup icons — same reasoning as ENEMY_DRAW:
+  // emoji glyphs depend on the platform's emoji font and can render washed-out.
+  const POWERUP_DRAW = {
+    shield(p){
+      const r = 13;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.beginPath();
+      ctx.moveTo(0, -r);
+      ctx.quadraticCurveTo(r, -r * 0.6, r * 0.85, 0);
+      ctx.quadraticCurveTo(r * 0.7, r * 0.9, 0, r * 1.05);
+      ctx.quadraticCurveTo(-r * 0.7, r * 0.9, -r * 0.85, 0);
+      ctx.quadraticCurveTo(-r, -r * 0.6, 0, -r);
+      ctx.closePath();
+      const g = ctx.createLinearGradient(0, -r, 0, r);
+      g.addColorStop(0, '#fff3b0');
+      g.addColorStop(1, '#e6a83c');
+      ctx.fillStyle = g;
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,.6)';
+      ctx.lineWidth = 1.4;
+      ctx.stroke();
+      ctx.restore();
+    },
+
+    rapid(p){
+      const r = 13;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(-0.3);
+      ctx.beginPath();
+      ctx.moveTo(0, -r * 0.9);
+      ctx.quadraticCurveTo(r * 0.75, -r * 0.3, r * 0.5, r * 0.5);
+      ctx.quadraticCurveTo(r * 0.2, r * 1.05, -r * 0.1, r * 0.8);
+      ctx.quadraticCurveTo(-r * 0.6, r * 0.4, -r * 0.35, -r * 0.4);
+      ctx.closePath();
+      const g = ctx.createLinearGradient(-r, -r, r, r);
+      g.addColorStop(0, '#ff8a5c');
+      g.addColorStop(1, '#d92626');
+      ctx.fillStyle = g;
+      ctx.fill();
+      ctx.fillStyle = '#4a8f3c';
+      ctx.beginPath();
+      ctx.ellipse(0, -r * 0.9, r * 0.22, r * 0.16, 0.3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    },
+
+    spread(p){
+      const r = 13;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(0.5);
+      ctx.beginPath();
+      ctx.ellipse(0, -r * 0.4, r * 0.55, r * 0.75, 0, 0, Math.PI * 2);
+      const g = ctx.createLinearGradient(0, -r, 0, 0);
+      g.addColorStop(0, '#f2f6fb');
+      g.addColorStop(1, '#b7c3d1');
+      ctx.fillStyle = g;
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,.5)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.fillStyle = '#c7d0da';
+      ctx.fillRect(-r * 0.1, r * 0.15, r * 0.2, r * 0.9);
+      ctx.restore();
+    },
+
+    pierce(p){
+      const r = 13;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(-0.6);
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.15, -r * 1.05);
+      ctx.lineTo(r * 0.15, -r * 1.05);
+      ctx.lineTo(r * 0.15, r * 0.15);
+      ctx.lineTo(-r * 0.15, r * 0.15);
+      ctx.closePath();
+      const g = ctx.createLinearGradient(-r * 0.15, 0, r * 0.15, 0);
+      g.addColorStop(0, '#eef4fa');
+      g.addColorStop(1, '#9fb0c2');
+      ctx.fillStyle = g;
+      ctx.fill();
+      ctx.fillStyle = '#5a4632';
+      ctx.fillRect(-r * 0.18, r * 0.15, r * 0.36, r * 0.55);
+      ctx.restore();
+    },
+
+    turbo(p){
+      const r = 13;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.beginPath();
+      ctx.moveTo(r * 0.1, -r * 1.05);
+      ctx.lineTo(-r * 0.55, r * 0.15);
+      ctx.lineTo(-r * 0.05, r * 0.15);
+      ctx.lineTo(-r * 0.25, r * 1.05);
+      ctx.lineTo(r * 0.6, -r * 0.1);
+      ctx.lineTo(r * 0.1, -r * 0.1);
+      ctx.closePath();
+      const g = ctx.createLinearGradient(0, -r, 0, r);
+      g.addColorStop(0, '#fff7c2');
+      g.addColorStop(1, '#ffcc3d');
+      ctx.fillStyle = g;
+      ctx.fill();
+      ctx.restore();
+    },
+
+    bomb(p){
+      const r = 13;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.beginPath();
+      ctx.arc(0, r * 0.15, r * 0.78, 0, Math.PI * 2);
+      const g = ctx.createRadialGradient(-r * 0.25, -r * 0.1, r * 0.1, 0, r * 0.15, r * 0.9);
+      g.addColorStop(0, '#5a6472');
+      g.addColorStop(1, '#14181f');
+      ctx.fillStyle = g;
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,.25)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.strokeStyle = '#c9a165';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(r * 0.2, -r * 0.55);
+      ctx.quadraticCurveTo(r * 0.55, -r * 0.9, r * 0.35, -r * 1.15);
+      ctx.stroke();
+      ctx.fillStyle = '#ffb238';
+      ctx.beginPath();
+      ctx.arc(r * 0.35, -r * 1.15, r * 0.16, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    },
+
+    life(p){
+      const r = 13;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.beginPath();
+      ctx.moveTo(0, r * 0.85);
+      ctx.bezierCurveTo(-r * 1.1, r * 0.05, -r * 0.85, -r * 0.95, 0, -r * 0.35);
+      ctx.bezierCurveTo(r * 0.85, -r * 0.95, r * 1.1, r * 0.05, 0, r * 0.85);
+      ctx.closePath();
+      const g = ctx.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r * 1.1);
+      g.addColorStop(0, '#ff8fa8');
+      g.addColorStop(1, '#e0264f');
+      ctx.fillStyle = g;
+      ctx.fill();
+      ctx.restore();
+    },
+
+    laser(p){
+      const r = 13;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(-0.5);
+      ctx.beginPath();
+      ctx.roundRect(-r * 0.35, -r * 1.05, r * 0.7, r * 2.1, r * 0.35);
+      const g = ctx.createLinearGradient(-r * 0.35, 0, r * 0.35, 0);
+      g.addColorStop(0, '#f6e2b0');
+      g.addColorStop(0.5, '#e8c274');
+      g.addColorStop(1, '#c99a4a');
+      ctx.fillStyle = g;
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(90,60,20,.5)';
+      ctx.lineWidth = 1;
+      for (const dy of [-r * 0.5, 0, r * 0.5]){
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.3, dy);
+        ctx.lineTo(r * 0.3, dy - r * 0.15);
+        ctx.stroke();
+      }
+      ctx.restore();
+    },
+
+    missile(p){
+      const r = 13;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(-0.5);
+      ctx.beginPath();
+      ctx.roundRect(-r * 0.4, -r * 1.05, r * 0.8, r * 2.1, r * 0.4);
+      const bunG = ctx.createLinearGradient(0, -r, 0, r);
+      bunG.addColorStop(0, '#f2c27a');
+      bunG.addColorStop(1, '#c98a3d');
+      ctx.fillStyle = bunG;
+      ctx.fill();
+      ctx.beginPath();
+      ctx.roundRect(-r * 0.24, -r * 0.85, r * 0.48, r * 1.7, r * 0.24);
+      const dogG = ctx.createLinearGradient(0, -r, 0, r);
+      dogG.addColorStop(0, '#c9573d');
+      dogG.addColorStop(1, '#8f2d1e');
+      ctx.fillStyle = dogG;
+      ctx.fill();
+      ctx.restore();
+    },
+  };
+
   function drawPowerups(){
     ctx.save();
     ctx.shadowColor = '#baf6ff';
     ctx.shadowBlur = 10;
-    for (const p of powerups) {
-      drawBadge(p.x, p.y, 13, '#baf6ff');
-      drawEmoji(POWERUP_TYPES[p.type].emoji, p.x, p.y, 26);
-    }
+    for (const p of powerups) (POWERUP_DRAW[p.type] || POWERUP_DRAW.life)(p);
     ctx.restore();
   }
 
