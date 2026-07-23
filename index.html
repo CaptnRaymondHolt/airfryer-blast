@@ -118,7 +118,6 @@
     max-width: 100%;
     max-height: 100%;
     width: auto; height: auto;
-    aspect-ratio: 390 / 680;
     border-radius: 12px;
     background: radial-gradient(circle at 50% 0%, #142a46, #030509 78%);
     touch-action: none;
@@ -191,6 +190,9 @@
     .chip .val { font-size: 17px; }
     footer { font-size: .62rem; }
   }
+  @media (min-width: 860px) and (pointer: fine) {
+    .stage { max-width: min(94vw, 920px); }
+  }
 </style>
 </head>
 <body>
@@ -211,7 +213,7 @@
     <div class="overlay" id="startOverlay">
       <div class="bigemoji">🍟🚀</div>
       <h2>Air Fryer Blast</h2>
-      <p>Ta friteuse a pris son envol ! Dégomme les surgelés envahisseurs (frites, nuggets, pizzas, glaçons, donuts, pop-corn) avant qu'ils n'atteignent le fond du panier. Ramasse les bonus 🧈🌶️🥄🔪⚡💣❤️, slalome entre les grilles 🧱, et survis aux boss 🛍️🧊🍕.</p>
+      <p>Ta friteuse a pris son envol ! Dégomme les surgelés envahisseurs (frites, nuggets, pizzas, glaçons, donuts, pop-corn) avant qu'ils n'atteignent le fond du panier. Ramasse les bonus 🧈🌶️🥄🔪⚡💣❤️, change d'arme avec 🥖 (laser perçant) et 🌭 (missile à tête chercheuse), slalome entre les grilles 🧱, et survis aux boss 🛍️🧊🍕.</p>
       <p class="hint">Clavier : <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> ou <kbd>WASD</kbd> — tir automatique.<br>Tactile / souris : glisse le doigt sur l'écran, le vaisseau reste visible au-dessus.</p>
       <button class="primary" id="startBtn">Décoller</button>
     </div>
@@ -244,6 +246,11 @@
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
   const stageEl = document.getElementById('stage');
+
+  // On a desktop-sized, mouse-driven screen the phone-portrait canvas left most of
+  // the window empty — give it a wider, taller playfield there instead.
+  const isDesktop = window.matchMedia('(min-width: 860px) and (pointer: fine)').matches;
+  if (isDesktop) { canvas.width = 640; canvas.height = 760; }
   const W = canvas.width, H = canvas.height;
 
   const scoreEl = document.getElementById('score');
@@ -345,14 +352,23 @@
     kernel:  { emoji: '🌽', hp: 1, r: 9,  speed: 2.4, points: 8,  pattern: 'erratic' },
   };
   const POWERUP_TYPES = {
-    shield: { emoji: '🧈', weight: 3 },
-    rapid:  { emoji: '🌶️', weight: 3 },
-    spread: { emoji: '🥄', weight: 3 },
-    pierce: { emoji: '🔪', weight: 2 },
-    turbo:  { emoji: '⚡', weight: 2 },
-    bomb:   { emoji: '💣', weight: 1.5 },
-    life:   { emoji: '❤️', weight: 1 },
+    shield:  { emoji: '🧈', weight: 3 },
+    rapid:   { emoji: '🌶️', weight: 3 },
+    spread:  { emoji: '🥄', weight: 3 },
+    pierce:  { emoji: '🔪', weight: 2 },
+    turbo:   { emoji: '⚡', weight: 2 },
+    bomb:    { emoji: '💣', weight: 1.5 },
+    life:    { emoji: '❤️', weight: 1 },
+    laser:   { emoji: '🥖', weight: 2 },
+    missile: { emoji: '🌭', weight: 1.6 },
   };
+  // Weapon-swap pickups (laser, missile) key into this by the same name as their POWERUP_TYPES entry.
+  const WEAPON_TYPES = {
+    basic:   { emoji: '🧺' },
+    laser:   { emoji: '🥖' },
+    missile: { emoji: '🌭' },
+  };
+  const WEAPON_DURATION = 12000;
 
   // ---------- state ----------
   let running = false;
@@ -367,6 +383,7 @@
   let target = { x: W/2, y: H - 90 };
   let fireCooldown = 0;
   let spreadLevel = 0, rapidTimer = 0, shieldActive = false, pierceTimer = 0, turboTimer = 0;
+  let activeWeapon = 'basic', weaponTimer = 0;
   let invulnTimer = 0;
   let waveSpawnTimer = 0, waveSpawnedCount = 0, waveEnemyTarget = 0, waveSpawningDone = false, wallSpawnTimer = 0;
   let trailTimer = 0;
@@ -384,6 +401,7 @@
     bullets = []; enemyBullets = []; enemies = []; powerups = []; particles = []; walls = []; floatingTexts = [];
     fireCooldown = 0; spreadLevel = 0; rapidTimer = 0; shieldActive = false; invulnTimer = 0;
     pierceTimer = 0; turboTimer = 0; wallSpawnTimer = 1500; trailTimer = 0;
+    activeWeapon = 'basic'; weaponTimer = 0;
     waveSpawnTimer = 0; waveSpawnedCount = 0; waveSpawningDone = false;
     bossActive = false; boss = null;
     bannerText = ''; bannerTimer = 0;
@@ -480,6 +498,7 @@
       playSound('explode');
     }
     else if (type === 'life') { lives = Math.min(6, lives + 1); pulseChip(livesEl); }
+    else if (type === 'laser' || type === 'missile') { activeWeapon = type; weaponTimer = WEAPON_DURATION; }
     updateHUD();
   }
 
@@ -638,36 +657,88 @@
     if (rapidTimer > 0) rapidTimer -= dt;
     if (pierceTimer > 0) pierceTimer -= dt;
     if (turboTimer > 0) turboTimer -= dt;
+    if (weaponTimer > 0) { weaponTimer -= dt; if (weaponTimer <= 0) activeWeapon = 'basic'; }
 
     fireCooldown -= dt;
     if (fireCooldown <= 0) {
-      const baseCd = rapidTimer > 0 ? 130 : 240;
-      fireCooldown = baseCd;
+      const cooldowns = {
+        basic:   rapidTimer > 0 ? 130 : 240,
+        laser:   rapidTimer > 0 ? 65  : 110,
+        missile: rapidTimer > 0 ? 260 : 420,
+      };
+      fireCooldown = cooldowns[activeWeapon];
       shoot();
     }
   }
 
   function shoot(){
     playSound('shoot');
-    const speed = 8.5;
     const angles = spreadLevel === 0 ? [0]
       : spreadLevel === 1 ? [-0.18, 0, 0.18]
       : spreadLevel === 2 ? [-0.34, -0.16, 0, 0.16, 0.34]
       : [-0.46, -0.3, -0.14, 0, 0.14, 0.3, 0.46];
     const pierce = pierceTimer > 0;
-    for (const a of angles){
-      bullets.push({
-        x: player.x, y: player.y - player.r,
-        vx: Math.sin(a) * speed, vy: -Math.cos(a) * speed,
-        r: 4, pierce,
-      });
+    if (activeWeapon === 'laser') {
+      const speed = 11;
+      for (const a of angles){
+        bullets.push({
+          kind: 'laser',
+          x: player.x, y: player.y - player.r,
+          vx: Math.sin(a) * speed, vy: -Math.cos(a) * speed,
+          r: 3, pierce: true,
+        });
+      }
+    } else if (activeWeapon === 'missile') {
+      const speed = 6.5;
+      for (const a of angles){
+        bullets.push({
+          kind: 'missile',
+          x: player.x, y: player.y - player.r,
+          vx: Math.sin(a) * speed, vy: -Math.cos(a) * speed,
+          r: 6, pierce, homing: true,
+        });
+      }
+    } else {
+      const speed = 8.5;
+      for (const a of angles){
+        bullets.push({
+          kind: 'basic',
+          x: player.x, y: player.y - player.r,
+          vx: Math.sin(a) * speed, vy: -Math.cos(a) * speed,
+          r: 4, pierce,
+        });
+      }
     }
+  }
+
+  function nearestTarget(x, y){
+    let best = null, bestD = Infinity;
+    for (const e of enemies){
+      const d = dist2(x, y, e.x, e.y);
+      if (d < bestD) { bestD = d; best = e; }
+    }
+    if (boss){
+      const d = dist2(x, y, boss.x, boss.y);
+      if (d < bestD) { bestD = d; best = boss; }
+    }
+    return best;
   }
 
   function updateBullets(dt){
     const dtScale = dt / 16.67;
     for (let i = bullets.length - 1; i >= 0; i--){
       const b = bullets[i];
+      if (b.homing) {
+        const tgt = nearestTarget(b.x, b.y);
+        if (tgt) {
+          const dx = tgt.x - b.x, dy = tgt.y - b.y;
+          const len = Math.max(1, Math.hypot(dx, dy));
+          const speed = Math.hypot(b.vx, b.vy);
+          const turn = clamp(0.16 * dtScale, 0, 1);
+          b.vx += (dx / len * speed - b.vx) * turn;
+          b.vy += (dy / len * speed - b.vy) * turn;
+        }
+      }
       b.x += b.vx * dtScale; b.y += b.vy * dtScale;
       if (b.y < -20 || b.x < -20 || b.x > W + 20) { bullets.splice(i,1); continue; }
     }
@@ -993,38 +1064,115 @@
     ctx.fillText(emoji, x, y);
   }
 
+  // Solid disc behind an emoji sprite so its glyph reads as fully opaque
+  // instead of letting the grid/background show through its transparent parts.
+  function drawBadge(x, y, r, glowColor){
+    ctx.save();
+    ctx.shadowColor = glowColor;
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = '#0b1420';
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  }
+
   function drawPlayer(){
     if (invulnTimer > 0 && Math.floor(invulnTimer/100) % 2 === 0) return;
+    const glowColor = turboTimer > 0 ? '#fff35e' : '#5ef1ff';
     ctx.save();
-    ctx.shadowColor = turboTimer > 0 ? '#fff35e' : '#5ef1ff';
+    ctx.translate(player.x, player.y);
+    ctx.shadowColor = glowColor;
     ctx.shadowBlur = turboTimer > 0 ? 24 : 14;
+
     if (shieldActive) {
       ctx.beginPath();
-      ctx.arc(player.x, player.y, player.r + 8, 0, Math.PI*2);
+      ctx.arc(0, 0, player.r + 8, 0, Math.PI*2);
       ctx.strokeStyle = 'rgba(127,214,255,.9)';
       ctx.lineWidth = 3;
       ctx.stroke();
     }
-    drawEmoji('🧺', player.x, player.y, 34);
-    drawEmoji('🔥', player.x, player.y + player.r + 6, 16);
+
+    // exhaust flame at the rear vent — flipped so its wide base hugs the fryer
+    // and the tip trails away, instead of looking sucked back into the ship.
+    ctx.save();
+    ctx.translate(0, player.r + 10);
+    ctx.rotate(Math.PI);
+    ctx.font = (turboTimer > 0 ? 20 : 16) + 'px serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = turboTimer > 0 ? '#fff35e' : '#ff8a3d';
+    ctx.shadowBlur = turboTimer > 0 ? 16 : 10;
+    ctx.fillText('🔥', 0, 0);
+    ctx.restore();
+
+    // airfryer body, nose (viewing window / dial) pointing forward — up the screen.
+    ctx.shadowColor = glowColor;
+    ctx.shadowBlur = turboTimer > 0 ? 20 : 12;
+    const w = 30, h = 34;
+    ctx.beginPath();
+    ctx.roundRect(-w/2, -h/2, w, h, 9);
+    const bodyGrad = ctx.createLinearGradient(0, -h/2, 0, h/2);
+    bodyGrad.addColorStop(0, '#f3f7fb');
+    bodyGrad.addColorStop(1, '#a9b4c4');
+    ctx.fillStyle = bodyGrad;
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = glowColor;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.ellipse(0, -h*0.16, w*0.32, h*0.22, 0, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(8,18,28,.8)';
+    ctx.fill();
+    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = '#5ef1ff';
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(0, -h*0.42, 3.2, 0, Math.PI*2);
+    ctx.shadowColor = '#ff2f8f';
+    ctx.shadowBlur = 8;
+    ctx.fillStyle = '#ff2f8f';
+    ctx.fill();
+
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(0,0,0,.4)';
+    ctx.lineWidth = 1.3;
+    for (let i = -1; i <= 1; i++){
+      ctx.beginPath();
+      ctx.moveTo(i*6, h*0.3);
+      ctx.lineTo(i*6, h*0.46);
+      ctx.stroke();
+    }
+
     ctx.restore();
   }
 
+  const BULLET_STYLE = {
+    basic:   { glow: '#5ef1ff', line: '#eafcff', dot: '#baf6ff', trail: 0.9 },
+    laser:   { glow: '#ff2f8f', line: '#ffd6f0', dot: '#ff8adf', trail: 1.7 },
+    missile: { glow: '#ffb238', line: '#ffd8a0', dot: '#ffb238', trail: 0.7 },
+  };
   function drawBullets(){
     ctx.save();
-    ctx.shadowBlur = 10;
-    ctx.shadowColor = '#5ef1ff';
-    ctx.strokeStyle = '#eafcff';
     ctx.lineWidth = 3;
     ctx.lineCap = 'round';
     for (const b of bullets){
+      const s = BULLET_STYLE[b.kind] || BULLET_STYLE.basic;
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = s.glow;
+      ctx.strokeStyle = s.line;
       ctx.beginPath();
-      ctx.moveTo(b.x - b.vx*0.9, b.y - b.vy*0.9);
+      ctx.moveTo(b.x - b.vx*s.trail, b.y - b.vy*s.trail);
       ctx.lineTo(b.x, b.y);
       ctx.stroke();
     }
-    ctx.fillStyle = '#baf6ff';
     for (const b of bullets){
+      const s = BULLET_STYLE[b.kind] || BULLET_STYLE.basic;
+      ctx.shadowBlur = 6;
+      ctx.shadowColor = s.dot;
+      ctx.fillStyle = s.dot;
       ctx.beginPath(); ctx.arc(b.x,b.y,b.r,0,Math.PI*2); ctx.fill();
     }
     ctx.shadowColor = '#ff5c3d';
@@ -1047,6 +1195,7 @@
     ctx.shadowColor = '#ff2f8f';
     ctx.shadowBlur = 8;
     for (const e of enemies){
+      drawBadge(e.x, e.y, e.r * 0.94, '#ff2f8f');
       drawEmoji(e.def.emoji, e.x, e.y, e.r*2);
       if (e.hp < e.maxHp) {
         const w = e.r*2;
@@ -1068,6 +1217,7 @@
     ctx.save();
     ctx.shadowColor = BOSS_GLOW[boss.kind] || '#ff2f8f';
     ctx.shadowBlur = 22;
+    drawBadge(boss.x, boss.y, boss.r * 0.92, BOSS_GLOW[boss.kind] || '#ff2f8f');
     drawEmoji(BOSS_EMOJI[boss.kind] || '🛍️', boss.x, boss.y, boss.r * 2);
     ctx.restore();
     const w = 200;
@@ -1106,7 +1256,10 @@
     ctx.save();
     ctx.shadowColor = '#baf6ff';
     ctx.shadowBlur = 10;
-    for (const p of powerups) drawEmoji(POWERUP_TYPES[p.type].emoji, p.x, p.y, 26);
+    for (const p of powerups) {
+      drawBadge(p.x, p.y, 13, '#baf6ff');
+      drawEmoji(POWERUP_TYPES[p.type].emoji, p.x, p.y, 26);
+    }
     ctx.restore();
   }
 
@@ -1130,6 +1283,7 @@
     if (pierceTimer > 0) buffs.push({ emoji: '🔪', frac: pierceTimer / 9000 });
     if (turboTimer > 0) buffs.push({ emoji: '⚡', frac: turboTimer / 9000 });
     if (spreadLevel > 0) buffs.push({ emoji: '🥄', frac: 1, count: spreadLevel });
+    if (weaponTimer > 0) buffs.push({ emoji: WEAPON_TYPES[activeWeapon].emoji, frac: weaponTimer / WEAPON_DURATION });
     if (!buffs.length) return;
     ctx.save();
     const y = 46, size = 14, gap = 32;
