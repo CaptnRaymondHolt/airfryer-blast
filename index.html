@@ -183,6 +183,23 @@
     border-color: #ff5c3d;
     box-shadow: 0 0 14px rgba(255,60,40,.7);
   }
+  .lengthBtn.active {
+    color: #04150a;
+    background: linear-gradient(180deg, #8fe6a8, #2e8f4a);
+    border-color: #2e8f4a;
+    box-shadow: 0 0 12px rgba(46,143,74,.6);
+  }
+  .skinRow { display: flex; gap: 8px; align-items: center; }
+  .skinSwatch {
+    width: 30px; height: 30px; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,.35);
+    cursor: pointer;
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px;
+  }
+  .skinSwatch.active { border-color: #fff; box-shadow: 0 0 10px rgba(255,255,255,.7); }
+  .skinSwatch.locked { opacity: .35; cursor: not-allowed; filter: grayscale(.6); }
   .modeTag {
     font-family: "Bangers", cursive;
     font-size: 13px;
@@ -249,24 +266,34 @@
     <div class="overlay" id="startOverlay">
       <div class="bigemoji">🍟🚀</div>
       <h2>Air Fryer Blast</h2>
-      <p>Ta friteuse a pris son envol ! Dégomme les mauvais aliments qui font grossir (frites, nuggets, pizzas, donuts, pop-corn) et les trucs qui pourraient te griller (glaçons, iceberg ❄️) avant qu'ils n'atteignent le fond du panier. Ramasse les brocolis 🥦 : leur couleur change l'évolution de tes tirs (bouclier, tir rapide, tir large, perçant, turbo, bombe, vie, laser, missile). Slalome entre les grilles 🧱, et survis aux boss 🛍️🧊🍕🍩🍿.</p>
-      <p class="hint">Clavier : <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> ou <kbd>WASD</kbd> — tir automatique.<br>Tactile / souris : glisse le doigt sur l'écran, le vaisseau reste visible au-dessus.</p>
+      <p>Ta friteuse a pris son envol ! Dégomme les mauvais aliments qui font grossir (frites, nuggets, pizzas, donuts, pop-corn) et les trucs qui pourraient te griller (glaçons, iceberg ❄️) avant qu'ils n'atteignent le fond du panier. Ramasse les brocolis 🥦 : leur couleur change l'évolution de tes tirs (bouclier, tir rapide, tir large, perçant, turbo, bombe, vie, laser, missile). Attention à la surchauffe si tu abuses du tir rapide/laser ! Slalome entre les grilles 🧱, et survis aux boss 🛍️🧊🍕🍩🍿.</p>
+      <p class="hint">Clavier : <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> ou <kbd>WASD</kbd> — tir automatique.<br>Tactile / souris : glisse le doigt sur l'écran, le vaisseau reste visible au-dessus.<br>Mode Campagne : 15 vagues puis victoire !</p>
       <div class="modeSwitch">
         <button type="button" class="modeBtn" data-mode="normal">Normal</button>
         <button type="button" class="modeBtn" data-mode="extreme">Extrême 🔥</button>
       </div>
+      <div class="modeSwitch">
+        <button type="button" class="modeBtn lengthBtn" data-length="endless">Infini</button>
+        <button type="button" class="modeBtn lengthBtn" data-length="campaign">Campagne (15)</button>
+      </div>
+      <div class="skinRow" id="skinRowStart"></div>
       <button class="primary" id="startBtn">Décoller</button>
     </div>
 
     <div class="overlay hidden" id="endOverlay">
-      <div class="bigemoji">💥</div>
-      <h2>Cramé !</h2>
+      <div class="bigemoji" id="endEmoji">💥</div>
+      <h2 id="endTitle">Cramé !</h2>
       <p>Score final : <strong id="finalScore">0</strong> — Vague <strong id="finalWave">1</strong></p>
       <p class="newbest hidden" id="newBestMsg">🏆 Nouveau record !</p>
       <div class="modeSwitch">
         <button type="button" class="modeBtn" data-mode="normal">Normal</button>
         <button type="button" class="modeBtn" data-mode="extreme">Extrême 🔥</button>
       </div>
+      <div class="modeSwitch">
+        <button type="button" class="modeBtn lengthBtn" data-length="endless">Infini</button>
+        <button type="button" class="modeBtn lengthBtn" data-length="campaign">Campagne (15)</button>
+      </div>
+      <div class="skinRow" id="skinRowEnd"></div>
       <button class="primary" id="restartBtn">Redécoller</button>
     </div>
 
@@ -313,12 +340,16 @@
   const pauseBtn = document.getElementById('pauseBtn');
   const resumeBtn = document.getElementById('resumeBtn');
   const modeTag = document.getElementById('modeTag');
-  const modeButtons = document.querySelectorAll('.modeBtn');
+  const modeButtons = document.querySelectorAll('[data-mode]');
+  const lengthButtons = document.querySelectorAll('[data-length]');
+  const endEmoji = document.getElementById('endEmoji');
+  const endTitle = document.getElementById('endTitle');
 
   const BEST_KEY = 'airfryerblast_best';
   const BEST_KEY_EXTREME = 'airfryerblast_best_extreme';
   const MUTE_KEY = 'airfryerblast_muted';
   const MODE_KEY = 'airfryerblast_mode';
+  const LENGTH_KEY = 'airfryerblast_length';
 
   // Extreme is tuned to stay winnable: every multiplier is applied on top of an
   // existing floor/cap (fire-rate floor, wall-gap floor, bullet-speed cap), so
@@ -347,6 +378,50 @@
   }
   modeButtons.forEach(btn => btn.addEventListener('click', () => setMode(btn.dataset.mode)));
   setMode(mode);
+
+  let campaignMode = localStorage.getItem(LENGTH_KEY) === 'campaign';
+  function setLength(v){
+    campaignMode = v === 'campaign';
+    localStorage.setItem(LENGTH_KEY, campaignMode ? 'campaign' : 'endless');
+    lengthButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.length === (campaignMode ? 'campaign' : 'endless')));
+  }
+  lengthButtons.forEach(btn => btn.addEventListener('click', () => setLength(btn.dataset.length)));
+  setLength(campaignMode ? 'campaign' : 'endless');
+
+  // ---------- ship skins (score-unlocked palette swaps) ----------
+  const SKIN_KEY = 'airfryerblast_skin';
+  const SHIP_SKINS = [
+    { id: 'chrome', name: 'Chrome',   unlock: 0,    top: '#f3f7fb', bottom: '#a9b4c4' },
+    { id: 'magma',  name: 'Magma',    unlock: 400,  top: '#ffcf9e', bottom: '#c9401f' },
+    { id: 'toxic',  name: 'Toxique',  unlock: 1500, top: '#d9ffb0', bottom: '#4a9e2f' },
+    { id: 'royal',  name: 'Royal',    unlock: 4000, top: '#e0c2ff', bottom: '#6a2fc9' },
+  ];
+  function maxBestScore(){
+    return Math.max(Number(localStorage.getItem(BEST_KEY) || 0), Number(localStorage.getItem(BEST_KEY_EXTREME) || 0));
+  }
+  let selectedSkin = localStorage.getItem(SKIN_KEY) || 'chrome';
+  function skinFor(id){ return SHIP_SKINS.find(s => s.id === id) || SHIP_SKINS[0]; }
+  function setSkin(id){
+    if (skinFor(id).unlock > maxBestScore()) return;
+    selectedSkin = id;
+    localStorage.setItem(SKIN_KEY, id);
+    renderSkinPicker();
+  }
+  function renderSkinPicker(){
+    const bestNow = maxBestScore();
+    const html = SHIP_SKINS.map(s => {
+      const unlocked = bestNow >= s.unlock;
+      const cls = ['skinSwatch', s.id === selectedSkin ? 'active' : '', unlocked ? '' : 'locked'].filter(Boolean).join(' ');
+      const title = unlocked ? s.name : `${s.name} — débloqué à ${s.unlock} pts`;
+      return `<div class="${cls}" data-skin="${s.id}" title="${title}" style="background:linear-gradient(180deg, ${s.top}, ${s.bottom})">${unlocked ? '' : '🔒'}</div>`;
+    }).join('');
+    ['skinRowStart', 'skinRowEnd'].forEach(rowId => {
+      const row = document.getElementById(rowId);
+      row.innerHTML = html;
+      row.querySelectorAll('.skinSwatch').forEach(el => el.addEventListener('click', () => setSkin(el.dataset.skin)));
+    });
+  }
+  renderSkinPicker();
 
   // ---------- audio ----------
   let audioCtx = null;
@@ -382,6 +457,7 @@
     else if (name === 'wave') { tone(440, 0.1, 'triangle', 0, 0.16); tone(660, 0.14, 'triangle', 0.1, 0.16); }
     else if (name === 'boss') { tone(200, 0.2, 'sawtooth', 0, 0.18); tone(160, 0.24, 'sawtooth', 0.16, 0.18); tone(120, 0.3, 'sawtooth', 0.34, 0.18); }
     else if (name === 'gameover') { tone(440, 0.15, 'sine', 0, 0.15); tone(330, 0.18, 'sine', 0.15, 0.15); tone(220, 0.3, 'sine', 0.3, 0.15); }
+    else if (name === 'victory') { tone(523, 0.16, 'triangle', 0, 0.18); tone(659, 0.16, 'triangle', 0.14, 0.18); tone(784, 0.16, 'triangle', 0.28, 0.18); tone(1047, 0.3, 'triangle', 0.42, 0.2); }
   }
 
   // ---------- helpers ----------
@@ -437,6 +513,17 @@
   };
   const WEAPON_DURATION = 12000;
 
+  // Overheat: heat builds continuously from the current effective fire rate and
+  // decays otherwise. Base auto-fire alone always sits below the decay rate (never
+  // overheats); rapid and especially laser+rapid push well above it, so sustained
+  // use of the strongest combos risks a brief forced cooldown — base play is never
+  // punished, only the bonus-fueled bursts are.
+  const HEAT_PER_SHOT = { basic: 1.6, laser: 2.4, missile: 1.0 };
+  const RAPID_HEAT_MUL = 1.4;
+  const HEAT_DECAY_PER_SEC = 10;
+  const HEAT_MAX = 100;
+  const OVERHEAT_LOCKOUT = 1300;
+
   // ---------- state ----------
   let running = false;
   let score = 0;
@@ -450,12 +537,14 @@
   let target = { x: W/2, y: H - 90 };
   let fireCooldown = 0;
   let spreadLevel = 0, rapidTimer = 0, shieldActive = false, pierceTimer = 0, turboTimer = 0;
-  let activeWeapon = 'basic', weaponTimer = 0;
+  let activeWeapon = 'basic', weaponTimer = 0, weaponLevel = 1;
+  let heat = 0, overheated = false, overheatTimer = 0, steamTimer = 0;
   let invulnTimer = 0;
   let waveSpawnTimer = 0, waveSpawnedCount = 0, waveEnemyTarget = 0, waveSpawningDone = false, wallSpawnTimer = 0;
   let trailTimer = 0;
   let bossActive = false, boss = null;
-  let bannerText = '', bannerTimer = 0;
+  let bannerText = '', bannerSubText = '', bannerTimer = 0;
+  let flashTimer = 0;
   let lastTs = 0;
   let rafId = null;
 
@@ -468,10 +557,11 @@
     bullets = []; enemyBullets = []; enemies = []; powerups = []; particles = []; walls = []; floatingTexts = [];
     fireCooldown = 0; spreadLevel = 0; rapidTimer = 0; shieldActive = false; invulnTimer = 0;
     pierceTimer = 0; turboTimer = 0; wallSpawnTimer = 1500; trailTimer = 0;
-    activeWeapon = 'basic'; weaponTimer = 0;
+    activeWeapon = 'basic'; weaponTimer = 0; weaponLevel = 1;
+    heat = 0; overheated = false; overheatTimer = 0; steamTimer = 0;
     waveSpawnTimer = 0; waveSpawnedCount = 0; waveSpawningDone = false;
     bossActive = false; boss = null;
-    bannerText = ''; bannerTimer = 0;
+    bannerText = ''; bannerSubText = ''; bannerTimer = 0; flashTimer = 0;
     setupWave();
     updateHUD();
   }
@@ -484,10 +574,13 @@
       bossActive = true;
       waveEnemyTarget = 1;
       bannerText = 'BOSS !';
+      const upcomingKind = BOSS_KINDS[Math.floor(wave / 5 - 1) % BOSS_KINDS.length];
+      bannerSubText = BOSS_NAMES[upcomingKind] || '';
     } else {
       bossActive = false;
       waveEnemyTarget = Math.round(Math.min(6 + wave * 2, 34) * cfg().waveEnemyMul);
       bannerText = 'VAGUE ' + wave;
+      bannerSubText = '';
     }
     bannerTimer = 1600;
     playSound(bossActive ? 'boss' : 'wave');
@@ -526,7 +619,38 @@
     enemies.push(makeEnemy(typeKey, rand(30, W - 30), -30));
   }
 
+  // Occasionally spawns a choreographed cluster (same type, evenly spaced) instead
+  // of a single random enemy, for readable "bullet-hell art" rather than pure noise.
+  function spawnFormation(){
+    const typeKey = weightedEnemyType();
+    const kind = Math.random() < 0.5 ? 'line' : 'v';
+    const count = kind === 'line' ? (Math.random() < 0.5 ? 4 : 5) : 5;
+    const spacing = 46;
+    const totalW = spacing * (count - 1);
+    const startX = clamp(rand(30, W - 30) - totalW / 2, 30, Math.max(30, W - 30 - totalW));
+    for (let i = 0; i < count; i++){
+      const x = clamp(startX + i * spacing, 20, W - 20);
+      const y = kind === 'v' ? -30 - Math.abs(i - (count - 1) / 2) * 26 : -30;
+      enemies.push(makeEnemy(typeKey, x, y));
+    }
+    return count;
+  }
+
+  function spawnWaveEntry(){
+    const formationChance = clamp(0.12 + wave * 0.01, 0.12, 0.35);
+    if (wave >= 2 && Math.random() < formationChance) return spawnFormation();
+    spawnEnemy();
+    return 1;
+  }
+
   const BOSS_KINDS = ['sac', 'iceberg', 'mega', 'spiral', 'popper'];
+  const BOSS_NAMES = {
+    sac: 'LE SAC SURGELÉ',
+    iceberg: 'ICEBERG',
+    mega: 'MEGA PIZZA',
+    spiral: 'DONUT VORTEX',
+    popper: 'POP-CORN RAGE',
+  };
   function spawnBoss(){
     const kind = BOSS_KINDS[Math.floor(wave / 5 - 1) % BOSS_KINDS.length];
     const hpMul = kind === 'iceberg' ? 1.15 : kind === 'mega' ? 0.9 : kind === 'popper' ? 0.85 : kind === 'spiral' ? 1.05 : 1;
@@ -535,8 +659,10 @@
     boss = {
       kind, x: W/2, y: -60, r, hp, maxHp: hp,
       t: 0, dir: 1, shootTimer: fireInterval(800), spawnTimer: 2800, jitterTimer: 900, spiralAngle: 0,
-      entering: true,
+      hitFlash: 0, entering: true,
     };
+    flashTimer = 260;
+    shakeStage();
   }
 
   function spawnPowerup(x, y){
@@ -557,7 +683,7 @@
     else if (type === 'pierce') pierceTimer = 9000;
     else if (type === 'turbo') turboTimer = 9000;
     else if (type === 'bomb') {
-      for (const e of enemies) { addParticles(e.x, e.y, '#ffb238', 6); score += Math.round(e.def.points * 0.5); }
+      for (const e of enemies) { addParticles(e.x, e.y, '#ffb238', 6, true); score += Math.round(e.def.points * 0.5); }
       enemies.length = 0;
       enemyBullets.length = 0;
       if (boss) { boss.hp -= 15; if (boss.hp <= 0) killBoss(); }
@@ -565,17 +691,21 @@
       playSound('explode');
     }
     else if (type === 'life') { lives = Math.min(6, lives + 1); pulseChip(livesEl); }
-    else if (type === 'laser' || type === 'missile') { activeWeapon = type; weaponTimer = WEAPON_DURATION; }
+    else if (type === 'laser' || type === 'missile') {
+      weaponLevel = activeWeapon === type ? Math.min(2, weaponLevel + 1) : 1;
+      activeWeapon = type; weaponTimer = WEAPON_DURATION;
+    }
     updateHUD();
   }
 
-  function addParticles(x, y, color, count){
+  function addParticles(x, y, color, count, chunky){
     for (let i=0;i<count;i++){
       particles.push({
         x, y,
         vx: rand(-2.6, 2.6), vy: rand(-2.6, 2.6),
         life: rand(300, 600), maxLife: 600,
-        color,
+        color, chunky: !!chunky,
+        rot: rand(0, Math.PI*2), spin: rand(-0.2, 0.2),
       });
     }
   }
@@ -585,7 +715,7 @@
   }
 
   function killEnemy(e, idx){
-    addParticles(e.x, e.y, '#ffb238', 10);
+    addParticles(e.x, e.y, '#ffb238', 10, true);
     const gained = Math.round(e.def.points * (1 + combo * 0.25) * cfg().scoreMul);
     score += gained;
     spawnFloatingText(e.x, e.y - e.r - 6, '+' + gained);
@@ -604,7 +734,7 @@
   }
 
   function killBoss(){
-    addParticles(boss.x, boss.y, '#ff8a3d', 40);
+    addParticles(boss.x, boss.y, '#ff8a3d', 40, true);
     const gained = Math.round((500 + wave * 20) * cfg().scoreMul);
     score += gained;
     spawnFloatingText(boss.x, boss.y - 10, '+' + gained, '#ff8a3d');
@@ -636,7 +766,7 @@
     pulseChip(livesEl);
     updateHUD();
     vibrate([40, 30, 40]);
-    if (lives <= 0) endGame();
+    if (lives <= 0) endGame(false);
   }
 
   function updateHUD(){
@@ -715,7 +845,7 @@
         x: player.x + rand(-4,4), y: player.y + player.r,
         vx: rand(-0.3,0.3), vy: rand(0.7,1.3),
         life: 260, maxLife: 260,
-        color: turboTimer > 0 ? '#fff35e' : '#5ef1ff',
+        color: turboTimer > 0 ? '#fff35e' : activeWeapon === 'laser' ? '#ff8adf' : activeWeapon === 'missile' ? '#ffb238' : '#5ef1ff',
       });
       trailTimer = 40;
     }
@@ -724,15 +854,41 @@
     if (rapidTimer > 0) rapidTimer -= dt;
     if (pierceTimer > 0) pierceTimer -= dt;
     if (turboTimer > 0) turboTimer -= dt;
-    if (weaponTimer > 0) { weaponTimer -= dt; if (weaponTimer <= 0) activeWeapon = 'basic'; }
+    if (weaponTimer > 0) { weaponTimer -= dt; if (weaponTimer <= 0) { activeWeapon = 'basic'; weaponLevel = 1; } }
+
+    const cooldowns = {
+      basic:   rapidTimer > 0 ? 130 : 240,
+      laser:   rapidTimer > 0 ? 65  : 110,
+      missile: rapidTimer > 0 ? 260 : 420,
+    };
+
+    const shotsPerSec = 1000 / cooldowns[activeWeapon];
+    const heatPerShot = (HEAT_PER_SHOT[activeWeapon] || 1) * (rapidTimer > 0 ? RAPID_HEAT_MUL : 1);
+    const heatRate = shotsPerSec * heatPerShot - HEAT_DECAY_PER_SEC;
+    if (overheated) {
+      overheatTimer -= dt;
+      heat = HEAT_MAX;
+      if (overheatTimer <= 0) { overheated = false; heat = 0; }
+    } else {
+      heat = clamp(heat + heatRate * (dt / 1000), 0, HEAT_MAX);
+      if (heat >= HEAT_MAX) { overheated = true; overheatTimer = OVERHEAT_LOCKOUT; shakeStage(); playSound('hit'); }
+    }
+
+    if (overheated) {
+      steamTimer -= dt;
+      if (steamTimer <= 0) {
+        particles.push({
+          x: player.x + rand(-6, 6), y: player.y + player.r + 6,
+          vx: rand(-0.4, 0.4), vy: rand(-1.6, -0.8),
+          life: 420, maxLife: 420,
+          color: '#dfe8ee',
+        });
+        steamTimer = 70;
+      }
+    }
 
     fireCooldown -= dt;
-    if (fireCooldown <= 0) {
-      const cooldowns = {
-        basic:   rapidTimer > 0 ? 130 : 240,
-        laser:   rapidTimer > 0 ? 65  : 110,
-        missile: rapidTimer > 0 ? 260 : 420,
-      };
+    if (!overheated && fireCooldown <= 0) {
       fireCooldown = cooldowns[activeWeapon] * cfg().playerFireRateMul;
       shoot();
     }
@@ -747,23 +903,29 @@
     const pierce = pierceTimer > 0;
     if (activeWeapon === 'laser') {
       const speed = 11;
+      const lanes = weaponLevel >= 2 ? [-4, 4] : [0];
       for (const a of angles){
-        bullets.push({
-          kind: 'laser',
-          x: player.x, y: player.y - player.r,
-          vx: Math.sin(a) * speed, vy: -Math.cos(a) * speed,
-          r: 3, pierce: true,
-        });
+        for (const lane of lanes){
+          bullets.push({
+            kind: 'laser',
+            x: player.x + lane, y: player.y - player.r,
+            vx: Math.sin(a) * speed, vy: -Math.cos(a) * speed,
+            r: 3, pierce: true,
+          });
+        }
       }
     } else if (activeWeapon === 'missile') {
       const speed = 6.5;
+      const lanes = weaponLevel >= 2 ? [-5, 5] : [0];
       for (const a of angles){
-        bullets.push({
-          kind: 'missile',
-          x: player.x, y: player.y - player.r,
-          vx: Math.sin(a) * speed, vy: -Math.cos(a) * speed,
-          r: 6, pierce, homing: true,
-        });
+        for (const lane of lanes){
+          bullets.push({
+            kind: 'missile',
+            x: player.x + lane, y: player.y - player.r,
+            vx: Math.sin(a) * speed, vy: -Math.cos(a) * speed,
+            r: 6, pierce, homing: true,
+          });
+        }
       }
     } else {
       const speed = 8.5;
@@ -813,9 +975,21 @@
       const b = enemyBullets[i];
       b.x += b.vx * dtScale; b.y += b.vy * dtScale;
       if (b.y > H + 20 || b.y < -20 || b.x < -20 || b.x > W + 20) { enemyBullets.splice(i,1); continue; }
-      if (dist2(b.x,b.y,player.x,player.y) < (b.r + player.r)*(b.r + player.r)) {
+      const hitR = b.r + player.r;
+      if (dist2(b.x,b.y,player.x,player.y) < hitR*hitR) {
         enemyBullets.splice(i,1);
         hitPlayer();
+        continue;
+      }
+      // Graze: flying close to a bullet without getting hit scores a small bonus, once per bullet.
+      if (!b.grazed) {
+        const grazeR = hitR + 9;
+        if (dist2(b.x,b.y,player.x,player.y) < grazeR*grazeR) {
+          b.grazed = true;
+          score += 2;
+          spawnFloatingText(b.x, b.y, '+2', '#7fe0ff');
+          addParticles(b.x, b.y, '#7fe0ff', 2);
+        }
       }
     }
   }
@@ -882,11 +1056,14 @@
         continue;
       }
 
+      if (e.hitFlash > 0) e.hitFlash -= dt;
+
       for (let j = bullets.length - 1; j >= 0; j--){
         const b = bullets[j];
         if (dist2(b.x,b.y,e.x,e.y) < (b.r + e.r)*(b.r + e.r)) {
           if (!b.pierce) bullets.splice(j,1);
           e.hp--;
+          e.hitFlash = 100;
           if (e.hp <= 0) { killEnemy(e, i); }
           break;
         }
@@ -977,11 +1154,14 @@
       if (invulnTimer <= 0 && dist2(boss.x,boss.y,player.x,player.y) < (boss.r + player.r)*(boss.r + player.r)) {
         hitPlayer();
       }
+      if (boss.hitFlash > 0) boss.hitFlash -= dt;
+
       for (let j = bullets.length - 1; j >= 0; j--){
         const b = bullets[j];
         if (dist2(b.x,b.y,boss.x,boss.y) < (b.r + boss.r)*(b.r + boss.r)) {
           if (!b.pierce) bullets.splice(j,1);
           boss.hp--;
+          boss.hitFlash = 100;
           if (boss.hp <= 0) { killBoss(); return; }
         }
       }
@@ -1058,6 +1238,7 @@
     for (let i = particles.length - 1; i >= 0; i--){
       const p = particles[i];
       p.x += p.vx; p.y += p.vy;
+      if (p.chunky) p.rot += p.spin;
       p.life -= dt;
       if (p.life <= 0) particles.splice(i,1);
     }
@@ -1076,14 +1257,16 @@
   function updateWave(dt){
     if (comboTimer > 0) { comboTimer -= dt; if (comboTimer <= 0) combo = 0; }
     if (bannerTimer > 0) bannerTimer -= dt;
+    if (flashTimer > 0) flashTimer -= dt;
 
     if (bossActive) {
+      // Note: boss and bossActive are always cleared together by killBoss(), so once the
+      // boss is dead this whole branch is already false — wave advance for boss waves
+      // happens below, via the enemies.length===0 fallback (it also covers boss-spawned
+      // minions that may still be alive after the boss itself dies).
       if (!boss && waveSpawnedCount === 0) {
         waveSpawnTimer -= dt;
         if (waveSpawnTimer <= 0) { spawnBoss(); waveSpawnedCount = 1; waveSpawningDone = true; }
-      }
-      if (waveSpawningDone && !boss) {
-        bannerTimer = 1400; wave++; setupWave();
       }
       return;
     }
@@ -1099,12 +1282,12 @@
     if (!waveSpawningDone) {
       waveSpawnTimer -= dt;
       if (waveSpawnTimer <= 0 && waveSpawnedCount < waveEnemyTarget) {
-        spawnEnemy();
-        waveSpawnedCount++;
+        waveSpawnedCount += spawnWaveEntry();
         waveSpawnTimer = Math.max(650 - wave * 18, 220);
         if (waveSpawnedCount >= waveEnemyTarget) waveSpawningDone = true;
       }
     } else if (enemies.length === 0) {
+      if (campaignMode && wave >= 15) { endGame(true); return; }
       wave++; setupWave();
     }
   }
@@ -1126,6 +1309,24 @@
     g.addColorStop(1, `rgb(${biome.bottom.join(',')})`);
     ctx.fillStyle = g;
     ctx.fillRect(0,0,W,H);
+
+    // distant parallax layer — big soft blobs drifting slower than the grid/dots,
+    // for a sense of depth behind the playfield.
+    ctx.save();
+    ctx.globalAlpha = 0.14;
+    for (let i = 0; i < 6; i++){
+      const bx = ((i * 137 + 40) % (W + 200)) - 100;
+      const by = ((t / 45 + i * 220) % (H + 300)) - 150;
+      const pr = 70 + (i % 3) * 30;
+      const pg = ctx.createRadialGradient(bx, by, 0, bx, by, pr);
+      pg.addColorStop(0, i % 2 === 0 ? biome.dot1 : biome.dot2);
+      pg.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = pg;
+      ctx.beginPath();
+      ctx.arc(bx, by, pr, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
 
     ctx.save();
     ctx.globalAlpha = 0.3;
@@ -1351,7 +1552,7 @@
 
   function drawPlayer(){
     if (invulnTimer > 0 && Math.floor(invulnTimer/100) % 2 === 0) return;
-    const glowColor = turboTimer > 0 ? '#fff35e' : '#5ef1ff';
+    const glowColor = turboTimer > 0 ? '#fff35e' : activeWeapon === 'laser' ? '#ff8adf' : activeWeapon === 'missile' ? '#ffb238' : '#5ef1ff';
     ctx.save();
     ctx.translate(player.x, player.y);
     ctx.shadowColor = glowColor;
@@ -1384,9 +1585,10 @@
     const w = 30, h = 34;
     ctx.beginPath();
     ctx.roundRect(-w/2, -h/2, w, h, 9);
+    const skin = skinFor(selectedSkin);
     const bodyGrad = ctx.createLinearGradient(0, -h/2, 0, h/2);
-    bodyGrad.addColorStop(0, '#f3f7fb');
-    bodyGrad.addColorStop(1, '#a9b4c4');
+    bodyGrad.addColorStop(0, skin.top);
+    bodyGrad.addColorStop(1, skin.bottom);
     ctx.fillStyle = bodyGrad;
     ctx.fill();
     ctx.lineWidth = 2;
@@ -1462,12 +1664,28 @@
     ctx.restore();
   }
 
+  function drawHitFlash(x, y, r, frac){
+    if (frac <= 0) return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = frac;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r * 1.15);
+    g.addColorStop(0, 'rgba(255,255,255,.9)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(x, y, r * 1.15, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
   function drawEnemies(){
     ctx.save();
     ctx.shadowColor = '#ff2f8f';
     ctx.shadowBlur = 8;
     for (const e of enemies){
       (ENEMY_DRAW[e.type] || ENEMY_DRAW.frite)(e);
+      drawHitFlash(e.x, e.y, e.r, clamp((e.hitFlash || 0) / 100, 0, 1));
       if (e.hp < e.maxHp) {
         const w = e.r*2;
         ctx.shadowBlur = 0;
@@ -1620,6 +1838,7 @@
     ctx.shadowBlur = 22;
     (BOSS_DRAW[boss.kind] || BOSS_DRAW.sac)(boss);
     ctx.restore();
+    drawHitFlash(boss.x, boss.y, boss.r, clamp((boss.hitFlash || 0) / 100, 0, 1));
     const w = 200;
     ctx.fillStyle = 'rgba(0,0,0,.45)';
     ctx.fillRect(W/2 - w/2, 14, w, 10);
@@ -1712,7 +1931,17 @@
       ctx.globalAlpha = clamp(p.life / p.maxLife, 0, 1);
       ctx.fillStyle = p.color;
       ctx.shadowColor = p.color;
-      ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI*2); ctx.fill();
+      if (p.chunky) {
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot || 0);
+        ctx.beginPath();
+        ctx.roundRect(-3.4, -2.3, 6.8, 4.6, 1.4);
+        ctx.fill();
+        ctx.restore();
+      } else {
+        ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI*2); ctx.fill();
+      }
     }
     ctx.restore();
     ctx.globalAlpha = 1;
@@ -1725,7 +1954,7 @@
     if (pierceTimer > 0) buffs.push({ type: 'pierce', frac: pierceTimer / 9000 });
     if (turboTimer > 0) buffs.push({ type: 'turbo', frac: turboTimer / 9000 });
     if (spreadLevel > 0) buffs.push({ type: 'spread', frac: 1, count: spreadLevel });
-    if (weaponTimer > 0) buffs.push({ type: activeWeapon, frac: weaponTimer / WEAPON_DURATION });
+    if (weaponTimer > 0) buffs.push({ type: activeWeapon, frac: weaponTimer / WEAPON_DURATION, count: weaponLevel });
     if (!buffs.length) return;
     ctx.save();
     const y = 46, size = 14, gap = 32;
@@ -1754,6 +1983,31 @@
     ctx.restore();
   }
 
+  function drawHeatGauge(t){
+    if (heat <= 0.5 && !overheated) return;
+    const w = 90, h = 7, x = W/2 - w/2, y = 68;
+    const frac = clamp(heat / HEAT_MAX, 0, 1);
+    const color = overheated ? '#ff3030' : frac > 0.75 ? '#ff8a3d' : frac > 0.4 ? '#ffe066' : '#6bff9d';
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,.4)';
+    ctx.fillRect(x, y, w, h);
+    ctx.shadowColor = color;
+    ctx.shadowBlur = overheated ? 12 + 6 * Math.sin(t / 80) : 6;
+    ctx.fillStyle = color;
+    ctx.fillRect(x, y, w * frac, h);
+    ctx.strokeStyle = 'rgba(255,255,255,.4)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+    if (overheated) {
+      ctx.font = '700 10px Fredoka, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#ff5c5c';
+      ctx.shadowBlur = 8;
+      ctx.fillText('SURCHAUFFE', W/2, y - 7);
+    }
+    ctx.restore();
+  }
+
   function drawFloatingTexts(){
     ctx.save();
     ctx.font = '700 16px Fredoka, sans-serif';
@@ -1772,15 +2026,28 @@
 
   function drawCombo(){
     if (combo <= 1 || comboTimer <= 0) return;
+    const onFire = combo >= 5;
     ctx.save();
     ctx.globalAlpha = clamp(comboTimer / 1200, 0, 1);
-    ctx.font = '700 22px Bangers, cursive';
+    ctx.font = (onFire ? '700 28px' : '700 22px') + ' Bangers, cursive';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.shadowColor = '#ffd34d';
-    ctx.shadowBlur = 14;
-    ctx.fillStyle = '#ffe27a';
-    ctx.fillText('COMBO x' + combo, W/2, 70);
+    ctx.shadowColor = onFire ? '#ff6a1a' : '#ffd34d';
+    ctx.shadowBlur = onFire ? 22 : 14;
+    ctx.fillStyle = onFire ? '#ffb238' : '#ffe27a';
+    ctx.fillText((onFire ? '🔥 ' : '') + 'COMBO x' + combo, W/2, 70);
+    ctx.restore();
+  }
+
+  function drawComboFire(t){
+    if (combo < 5 || comboTimer <= 0) return;
+    const pulse = 0.12 + 0.1 * Math.sin(t / 150);
+    ctx.save();
+    const g = ctx.createRadialGradient(W/2, H/2, H*0.4, W/2, H/2, H*0.8);
+    g.addColorStop(0, 'rgba(255,180,40,0)');
+    g.addColorStop(1, `rgba(255,150,30,${pulse})`);
+    ctx.fillStyle = g;
+    ctx.fillRect(0,0,W,H);
     ctx.restore();
   }
 
@@ -1811,6 +2078,24 @@
     ctx.lineWidth = 4;
     ctx.strokeText(bannerText, W/2, H/2 - 60);
     ctx.fillText(bannerText, W/2, H/2 - 60);
+    if (bannerSubText) {
+      ctx.font = '700 17px Fredoka, sans-serif';
+      ctx.shadowColor = '#ff2f8f';
+      ctx.shadowBlur = 12;
+      ctx.fillStyle = '#ffd6f0';
+      ctx.lineWidth = 3;
+      ctx.strokeText(bannerSubText, W/2, H/2 - 28);
+      ctx.fillText(bannerSubText, W/2, H/2 - 28);
+    }
+    ctx.restore();
+  }
+
+  function drawFlash(){
+    if (flashTimer <= 0) return;
+    ctx.save();
+    ctx.globalAlpha = clamp(flashTimer / 260, 0, 1) * 0.8;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, W, H);
     ctx.restore();
   }
 
@@ -1826,8 +2111,11 @@
     drawFloatingTexts();
     drawCombo();
     drawBuffs();
+    drawHeatGauge(t);
     drawDangerVignette(t);
+    drawComboFire(t);
     drawBanner();
+    drawFlash();
   }
 
   // ---------- loop ----------
@@ -1869,7 +2157,7 @@
     rafId = requestAnimationFrame(loop);
   }
 
-  function endGame(){
+  function endGame(victory){
     running = false;
     if (rafId) cancelAnimationFrame(rafId);
     const isNew = score > best;
@@ -1878,7 +2166,10 @@
     finalScoreEl.textContent = score;
     finalWaveEl.textContent = wave;
     newBestMsg.classList.toggle('hidden', !(isNew && score > 0));
-    playSound('gameover');
+    endEmoji.textContent = victory ? '🏆' : '💥';
+    endTitle.textContent = victory ? 'Victoire !' : 'Cramé !';
+    playSound(victory ? 'victory' : 'gameover');
+    renderSkinPicker();
     endOverlay.classList.remove('hidden');
   }
 
