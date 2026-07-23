@@ -158,6 +158,41 @@
     transition: transform .08s ease, box-shadow .08s ease;
   }
   button.primary:active { transform: translateY(4px); box-shadow: 0 2px 0 #c9821a; }
+
+  .modeSwitch { display: flex; gap: 8px; }
+  .modeBtn {
+    font-family: "Fredoka", sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    color: #cfe9ff;
+    background: rgba(8,16,30,.6);
+    border: 2px solid rgba(94,241,255,.35);
+    padding: 6px 14px;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  .modeBtn.active {
+    color: #2a1030;
+    background: linear-gradient(180deg, #ffe06b, #ffac1c);
+    border-color: #ffac1c;
+    box-shadow: 0 0 12px rgba(255,172,28,.6);
+  }
+  .modeBtn[data-mode="extreme"].active {
+    color: #fff;
+    background: linear-gradient(180deg, #ff7a5c, #d92626);
+    border-color: #ff5c3d;
+    box-shadow: 0 0 14px rgba(255,60,40,.7);
+  }
+  .modeTag {
+    font-family: "Bangers", cursive;
+    font-size: 13px;
+    letter-spacing: 1px;
+    color: #ffb199;
+    text-shadow: 0 0 10px rgba(255,60,40,.8);
+    animation: modePulse 1.6s ease-in-out infinite;
+  }
+  .modeTag.hidden { display: none; }
+  @keyframes modePulse { 50% { opacity: .55; } }
   .hint { font-size: 12px; opacity: .6; text-align: center; max-width: 320px; }
   kbd {
     background: rgba(255,255,255,.14);
@@ -206,6 +241,7 @@
     <div class="chip wave"><div class="lbl">Vague</div><div class="val" id="wave">1</div></div>
     <div class="chip lives"><div class="lbl">Vies</div><div class="val" id="lives">🧺🧺🧺🧺</div></div>
   </div>
+  <div class="modeTag hidden" id="modeTag">🔥 MODE EXTRÊME</div>
 
   <div class="stage" id="stage">
     <canvas id="game" width="390" height="680"></canvas>
@@ -215,6 +251,10 @@
       <h2>Air Fryer Blast</h2>
       <p>Ta friteuse a pris son envol ! Dégomme les surgelés envahisseurs (frites, nuggets, pizzas, glaçons, donuts, pop-corn) avant qu'ils n'atteignent le fond du panier. Ramasse les bonus 🧈🌶️🥄🔪⚡💣❤️, change d'arme avec 🥖 (laser perçant) et 🌭 (missile à tête chercheuse), slalome entre les grilles 🧱, et survis aux boss 🛍️🧊🍕🍩🍿.</p>
       <p class="hint">Clavier : <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> ou <kbd>WASD</kbd> — tir automatique.<br>Tactile / souris : glisse le doigt sur l'écran, le vaisseau reste visible au-dessus.</p>
+      <div class="modeSwitch">
+        <button type="button" class="modeBtn" data-mode="normal">Normal</button>
+        <button type="button" class="modeBtn" data-mode="extreme">Extrême 🔥</button>
+      </div>
       <button class="primary" id="startBtn">Décoller</button>
     </div>
 
@@ -223,6 +263,10 @@
       <h2>Cramé !</h2>
       <p>Score final : <strong id="finalScore">0</strong> — Vague <strong id="finalWave">1</strong></p>
       <p class="newbest hidden" id="newBestMsg">🏆 Nouveau record !</p>
+      <div class="modeSwitch">
+        <button type="button" class="modeBtn" data-mode="normal">Normal</button>
+        <button type="button" class="modeBtn" data-mode="extreme">Extrême 🔥</button>
+      </div>
       <button class="primary" id="restartBtn">Redécoller</button>
     </div>
 
@@ -268,14 +312,41 @@
   const pauseOverlay = document.getElementById('pauseOverlay');
   const pauseBtn = document.getElementById('pauseBtn');
   const resumeBtn = document.getElementById('resumeBtn');
+  const modeTag = document.getElementById('modeTag');
+  const modeButtons = document.querySelectorAll('.modeBtn');
 
   const BEST_KEY = 'airfryerblast_best';
+  const BEST_KEY_EXTREME = 'airfryerblast_best_extreme';
   const MUTE_KEY = 'airfryerblast_muted';
+  const MODE_KEY = 'airfryerblast_mode';
 
-  let best = Number(localStorage.getItem(BEST_KEY) || 0);
+  // Extreme is tuned to stay winnable: every multiplier is applied on top of an
+  // existing floor/cap (fire-rate floor, wall-gap floor, bullet-speed cap), so
+  // harder never slides into "impossible to react to". The player also gets a
+  // small fire-rate compensation to offset the tougher enemies.
+  const MODES = {
+    normal:  { label: 'Normal', startLives: 4, enemySpeedMul: 1,    bulletSpeedMul: 1,    fireRateMul: 1,    waveEnemyMul: 1,   bossHpMul: 1,   wallGapMul: 1,    powerupChanceMul: 1,    scoreMul: 1,   playerFireRateMul: 1 },
+    extreme: { label: 'Extrême', startLives: 3, enemySpeedMul: 1.25, bulletSpeedMul: 1.18, fireRateMul: 0.72, waveEnemyMul: 1.3, bossHpMul: 1.2, wallGapMul: 0.82, powerupChanceMul: 0.75, scoreMul: 1.5, playerFireRateMul: 0.9 },
+  };
+  function cfg(){ return MODES[mode]; }
+  function fireInterval(ms){ return Math.max(80, ms * cfg().fireRateMul); }
+  function bestKeyFor(m){ return m === 'extreme' ? BEST_KEY_EXTREME : BEST_KEY; }
+
+  let mode = localStorage.getItem(MODE_KEY) === 'extreme' ? 'extreme' : 'normal';
+  let best = 0;
   let muted = localStorage.getItem(MUTE_KEY) === '1';
-  bestEl.textContent = best;
   muteBtn.textContent = muted ? '🔇' : '🔊';
+
+  function setMode(m){
+    mode = m;
+    localStorage.setItem(MODE_KEY, mode);
+    best = Number(localStorage.getItem(bestKeyFor(mode)) || 0);
+    bestEl.textContent = best;
+    modeButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.mode === mode));
+    modeTag.classList.toggle('hidden', mode !== 'extreme');
+  }
+  modeButtons.forEach(btn => btn.addEventListener('click', () => setMode(btn.dataset.mode)));
+  setMode(mode);
 
   // ---------- audio ----------
   let audioCtx = null;
@@ -338,6 +409,8 @@
   const MAX_ENEMY_BULLETS = 70;
   function spawnEnemyBullet(b){
     if (enemyBullets.length >= MAX_ENEMY_BULLETS) return;
+    const mul = cfg().bulletSpeedMul;
+    b.vx *= mul; b.vy *= mul;
     enemyBullets.push(b);
   }
 
@@ -395,7 +468,7 @@
   const keys = { left:false, right:false, up:false, down:false };
 
   function resetState(){
-    score = 0; wave = 1; lives = 4; combo = 0; comboTimer = 0;
+    score = 0; wave = 1; lives = cfg().startLives; combo = 0; comboTimer = 0;
     player = { x: W/2, y: H - 90, r: 16 };
     target.x = player.x; target.y = player.y;
     bullets = []; enemyBullets = []; enemies = []; powerups = []; particles = []; walls = []; floatingTexts = [];
@@ -419,7 +492,7 @@
       bannerText = 'BOSS !';
     } else {
       bossActive = false;
-      waveEnemyTarget = Math.min(6 + wave * 2, 34);
+      waveEnemyTarget = Math.round(Math.min(6 + wave * 2, 34) * cfg().waveEnemyMul);
       bannerText = 'VAGUE ' + wave;
     }
     bannerTimer = 1600;
@@ -447,10 +520,10 @@
     return Object.assign({
       type: typeKey, def, x, y,
       hp: def.hp, maxHp: def.hp, r: def.r,
-      speed: def.speed * (1 + wave * 0.03),
+      speed: def.speed * (1 + wave * 0.03) * cfg().enemySpeedMul,
       t: 0, phase: rand(0, Math.PI*2),
       dir: Math.random() < 0.5 ? -1 : 1,
-      shootTimer: rand(600, 1400),
+      shootTimer: fireInterval(rand(600, 1400)),
     }, extra || {});
   }
 
@@ -463,17 +536,17 @@
   function spawnBoss(){
     const kind = BOSS_KINDS[Math.floor(wave / 5 - 1) % BOSS_KINDS.length];
     const hpMul = kind === 'iceberg' ? 1.15 : kind === 'mega' ? 0.9 : kind === 'popper' ? 0.85 : kind === 'spiral' ? 1.05 : 1;
-    const hp = Math.round((40 + wave * 12) * hpMul);
+    const hp = Math.round((40 + wave * 12) * hpMul * cfg().bossHpMul);
     const r = kind === 'iceberg' ? 38 : kind === 'mega' ? 40 : kind === 'popper' ? 40 : kind === 'spiral' ? 36 : 34;
     boss = {
       kind, x: W/2, y: -60, r, hp, maxHp: hp,
-      t: 0, dir: 1, shootTimer: 800, spawnTimer: 2800, jitterTimer: 900, spiralAngle: 0,
+      t: 0, dir: 1, shootTimer: fireInterval(800), spawnTimer: 2800, jitterTimer: 900, spiralAngle: 0,
       entering: true,
     };
   }
 
   function spawnPowerup(x, y){
-    if (Math.random() > 0.16) return;
+    if (Math.random() > 0.16 * cfg().powerupChanceMul) return;
     const pool = Object.entries(POWERUP_TYPES);
     const total = pool.reduce((s,[,v])=>s+v.weight, 0);
     let r = Math.random() * total;
@@ -519,7 +592,7 @@
 
   function killEnemy(e, idx){
     addParticles(e.x, e.y, '#ffb238', 10);
-    const gained = Math.round(e.def.points * (1 + combo * 0.25));
+    const gained = Math.round(e.def.points * (1 + combo * 0.25) * cfg().scoreMul);
     score += gained;
     spawnFloatingText(e.x, e.y - e.r - 6, '+' + gained);
     combo = Math.min(combo + 1, 8);
@@ -538,7 +611,7 @@
 
   function killBoss(){
     addParticles(boss.x, boss.y, '#ff8a3d', 40);
-    const gained = 500 + wave * 20;
+    const gained = Math.round((500 + wave * 20) * cfg().scoreMul);
     score += gained;
     spawnFloatingText(boss.x, boss.y - 10, '+' + gained, '#ff8a3d');
     spawnPowerup(boss.x, boss.y - 10);
@@ -666,7 +739,7 @@
         laser:   rapidTimer > 0 ? 65  : 110,
         missile: rapidTimer > 0 ? 260 : 420,
       };
-      fireCooldown = cooldowns[activeWeapon];
+      fireCooldown = cooldowns[activeWeapon] * cfg().playerFireRateMul;
       shoot();
     }
   }
@@ -800,7 +873,7 @@
         e.shootTimer -= dt;
         if (e.shootTimer <= 0 && e.y > 10 && e.y < H - 60) {
           enemyShoot(e);
-          e.shootTimer = Math.max(rand(1300, 2200) - wave * 30, 550);
+          e.shootTimer = fireInterval(Math.max(rand(1300, 2200) - wave * 30, 550));
         }
       }
 
@@ -845,7 +918,7 @@
       if (boss.kind === 'mega') {
         boss.spawnTimer -= dt;
         if (boss.spawnTimer <= 0 && enemies.length < 8) {
-          enemies.push(makeEnemy('nugget', boss.x, boss.y + boss.r, { dir: 1, shootTimer: rand(900, 1500) }));
+          enemies.push(makeEnemy('nugget', boss.x, boss.y + boss.r, { dir: 1, shootTimer: fireInterval(rand(900, 1500)) }));
           boss.spawnTimer = rand(2600, 3400);
         }
       } else if (boss.kind === 'popper') {
@@ -867,14 +940,14 @@
             const a = (Math.PI * 2 / n) * k;
             spawnEnemyBullet({ x: boss.x, y: boss.y, vx: Math.sin(a)*speed, vy: Math.cos(a)*speed, r: 5 });
           }
-          boss.shootTimer = rand(1700, 2300);
+          boss.shootTimer = fireInterval(rand(1700, 2300));
         } else if (boss.kind === 'mega') {
           const speed = Math.min(2.6 + wave * 0.03, 5);
           const angles = wave >= 15 ? [-0.6,-0.4,-0.2,0,0.2,0.4,0.6] : [-0.5, -0.25, 0, 0.25, 0.5];
           for (const a of angles){
             spawnEnemyBullet({ x: boss.x, y: boss.y + boss.r, vx: Math.sin(a)*speed, vy: Math.cos(a)*speed, r: 5 });
           }
-          boss.shootTimer = rand(1600, 2200);
+          boss.shootTimer = fireInterval(rand(1600, 2200));
         } else if (boss.kind === 'spiral') {
           const speed = Math.min(3 + wave * 0.03, 5.5);
           boss.spiralAngle += 0.34;
@@ -882,7 +955,7 @@
             const a = boss.spiralAngle + off;
             spawnEnemyBullet({ x: boss.x, y: boss.y, vx: Math.sin(a)*speed, vy: Math.cos(a)*speed, r: 5 });
           }
-          boss.shootTimer = Math.max(220 - wave * 2, 110);
+          boss.shootTimer = fireInterval(Math.max(220 - wave * 2, 110));
         } else if (boss.kind === 'popper') {
           const speed = Math.min(2.4 + wave * 0.03, 5);
           const n = 5 + Math.min(Math.floor(wave / 8), 4);
@@ -890,14 +963,14 @@
             const a = rand(-1.1, 1.1);
             spawnEnemyBullet({ x: boss.x, y: boss.y + boss.r * 0.4, vx: Math.sin(a)*speed, vy: Math.cos(a)*speed, r: 5 });
           }
-          boss.shootTimer = rand(900, 1400);
+          boss.shootTimer = fireInterval(rand(900, 1400));
         } else {
           const speed = Math.min(2.8 + wave * 0.04, 5);
           const angles = wave >= 10 ? [-0.4, -0.2, 0, 0.2, 0.4] : [-0.3, 0, 0.3];
           for (const a of angles){
             spawnEnemyBullet({ x: boss.x, y: boss.y + boss.r, vx: Math.sin(a)*speed, vy: Math.cos(a)*speed, r: 5 });
           }
-          boss.shootTimer = rand(1400, 2000);
+          boss.shootTimer = fireInterval(rand(1400, 2000));
         }
       }
       if (invulnTimer <= 0 && dist2(boss.x,boss.y,player.x,player.y) < (boss.r + player.r)*(boss.r + player.r)) {
@@ -928,7 +1001,7 @@
   }
 
   function spawnWallPair(){
-    const gapW = Math.max(90, 150 - wave * 3);
+    const gapW = Math.max(70, Math.max(90, 150 - wave * 3) * cfg().wallGapMul);
     const gapX = rand(20, W - 20 - gapW);
     const thickness = 20;
     const speed = 1.3 + wave * 0.02;
@@ -1778,7 +1851,7 @@
     if (rafId) cancelAnimationFrame(rafId);
     const isNew = score > best;
     if (isNew) best = score;
-    localStorage.setItem(BEST_KEY, best);
+    localStorage.setItem(bestKeyFor(mode), best);
     finalScoreEl.textContent = score;
     finalWaveEl.textContent = wave;
     newBestMsg.classList.toggle('hidden', !(isNew && score > 0));
