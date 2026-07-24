@@ -612,6 +612,7 @@
       t: 0, phase: rand(0, Math.PI*2),
       dir: Math.random() < 0.5 ? -1 : 1,
       shootTimer: fireInterval(rand(600, 1400)),
+      wobbleFreq: rand(0.8, 1.25), wobbleAmp: rand(0.7, 1.3), spinDir: Math.random() < 0.5 ? -1 : 1,
     }, extra || {});
   }
 
@@ -1423,7 +1424,6 @@
     frite(e){
       const r = e.r;
       ctx.save();
-      ctx.translate(e.x, e.y);
       const cw = r * 1.5, ch = r * 1.3;
       ctx.beginPath();
       ctx.moveTo(-cw * 0.34, ch * 0.42);
@@ -1461,7 +1461,6 @@
     nugget(e){
       const r = e.r;
       ctx.save();
-      ctx.translate(e.x, e.y);
       ctx.beginPath();
       const n = 10;
       for (let i = 0; i <= n; i++){
@@ -1486,7 +1485,6 @@
     pizza(e){
       const r = e.r;
       ctx.save();
-      ctx.translate(e.x, e.y);
       ctx.beginPath();
       ctx.moveTo(0, -r * 1.1);
       ctx.lineTo(r * 0.85, r * 0.8);
@@ -1513,7 +1511,6 @@
     glacon(e){
       const r = e.r;
       ctx.save();
-      ctx.translate(e.x, e.y);
       ctx.rotate(0.2);
       ctx.beginPath();
       ctx.roundRect(-r * 0.85, -r * 0.85, r * 1.7, r * 1.7, r * 0.3);
@@ -1539,7 +1536,6 @@
     donut(e){
       const r = e.r;
       ctx.save();
-      ctx.translate(e.x, e.y);
       ctx.beginPath();
       ctx.arc(0, 0, r, 0, Math.PI * 2);
       const g = ctx.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r * 1.05);
@@ -1568,7 +1564,6 @@
     popcorn(e){
       const r = e.r;
       ctx.save();
-      ctx.translate(e.x, e.y);
       const puffs = [
         [0, -r * 0.35, r * 0.62], [-r * 0.5, r * 0.05, r * 0.55], [r * 0.5, r * 0.05, r * 0.55],
         [-r * 0.2, r * 0.5, r * 0.5], [r * 0.22, r * 0.5, r * 0.5],
@@ -1588,7 +1583,6 @@
     kernel(e){
       const r = e.r;
       ctx.save();
-      ctx.translate(e.x, e.y);
       ctx.rotate(e.phase * 0.3);
       ctx.beginPath();
       ctx.ellipse(0, 0, r * 0.75, r, 0, 0, Math.PI * 2);
@@ -1795,12 +1789,29 @@
     ctx.restore();
   }
 
+  // Generic idle animation applied uniformly to every enemy type (rotation wobble +
+  // scale pulse + a hair of positional jitter) so still sprites read as alive without
+  // hand-animating each of the 7 shapes. wobbleFreq/wobbleAmp/spinDir are randomized
+  // per instance so a cluster of the same type doesn't move in perfect lockstep.
+  function drawEnemyAnimated(e){
+    ctx.save();
+    ctx.translate(e.x, e.y);
+    const jx = Math.sin(e.t / 65 * e.wobbleFreq + e.phase * 3) * 1.1 * e.wobbleAmp;
+    const jy = Math.cos(e.t / 80 * e.wobbleFreq + e.phase * 2) * 0.8 * e.wobbleAmp;
+    ctx.translate(jx, jy);
+    ctx.rotate(Math.sin(e.t / 240 * e.wobbleFreq + e.phase) * 0.16 * e.wobbleAmp * e.spinDir);
+    const pulse = 1 + Math.sin(e.t / 300 * e.wobbleFreq + e.phase * 1.7) * 0.055 * e.wobbleAmp;
+    ctx.scale(pulse, pulse);
+    (ENEMY_DRAW[e.type] || ENEMY_DRAW.frite)(e);
+    ctx.restore();
+  }
+
   function drawEnemies(){
     ctx.save();
     ctx.shadowColor = '#ff2f8f';
     ctx.shadowBlur = 8;
     for (const e of enemies){
-      (ENEMY_DRAW[e.type] || ENEMY_DRAW.frite)(e);
+      drawEnemyAnimated(e);
       drawHitFlash(e.x, e.y, e.r, clamp((e.hitFlash || 0) / 100, 0, 1));
       if (e.hp < e.maxHp) {
         const w = e.r*2;
