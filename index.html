@@ -266,7 +266,7 @@
     <div class="overlay" id="startOverlay">
       <div class="bigemoji">🍟🚀</div>
       <h2>Air Fryer Blast</h2>
-      <p>Ta friteuse a pris son envol ! Dégomme les mauvais aliments qui font grossir (frites, nuggets, pizzas, donuts, pop-corn) et les trucs qui pourraient te griller (glaçons, iceberg ❄️) avant qu'ils n'atteignent le fond du panier. Ramasse les brocolis 🥦 : leur couleur change l'évolution de tes tirs (bouclier, tir rapide, tir large, perçant, turbo, bombe, vie, laser, missile). Attention à la surchauffe si tu abuses du tir rapide/laser ! Slalome entre les grilles 🧱, et survis aux boss 🛍️🧊🍕🍩🍿.</p>
+      <p>Ta friteuse a pris son envol ! Dégomme les mauvais aliments qui font grossir (frites, nuggets, pizzas, donuts, pop-corn) et les trucs qui pourraient te griller (glaçons, iceberg ❄️) avant qu'ils n'atteignent le fond du panier. Ramasse les brocolis 🥦 : leur couleur change l'évolution de tes tirs (bouclier, tir rapide, tir large, perçant, turbo, bombe, vie, laser, missile, flamme). Attention à la surchauffe si tu abuses du tir rapide/laser/flamme ! Slalome entre les grilles 🧱, et survis aux boss 🛍️🧊🍕🍩🍿🍔.</p>
       <p class="hint">Clavier : <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> ou <kbd>WASD</kbd> — tir automatique.<br>Tactile / souris : glisse le doigt sur l'écran, le vaisseau reste visible au-dessus.<br>Mode Campagne : 15 vagues puis victoire !</p>
       <div class="modeSwitch">
         <button type="button" class="modeBtn" data-mode="normal">Normal</button>
@@ -510,6 +510,7 @@
     life:    { weight: 1 },
     laser:   { weight: 2 },
     missile: { weight: 1.6 },
+    flame:   { weight: 1.7 },
   };
   const WEAPON_DURATION = 12000;
 
@@ -518,7 +519,7 @@
   // overheats); rapid and especially laser+rapid push well above it, so sustained
   // use of the strongest combos risks a brief forced cooldown — base play is never
   // punished, only the bonus-fueled bursts are.
-  const HEAT_PER_SHOT = { basic: 1.6, laser: 2.4, missile: 1.0 };
+  const HEAT_PER_SHOT = { basic: 1.6, laser: 2.4, missile: 1.0, flame: 1.8 };
   const RAPID_HEAT_MUL = 1.4;
   const HEAT_DECAY_PER_SEC = 10;
   const HEAT_MAX = 100;
@@ -643,23 +644,25 @@
     return 1;
   }
 
-  const BOSS_KINDS = ['sac', 'iceberg', 'mega', 'spiral', 'popper'];
+  const BOSS_KINDS = ['sac', 'iceberg', 'mega', 'spiral', 'popper', 'burger'];
   const BOSS_NAMES = {
     sac: 'LE SAC SURGELÉ',
     iceberg: 'ICEBERG',
     mega: 'MEGA PIZZA',
     spiral: 'DONUT VORTEX',
     popper: 'POP-CORN RAGE',
+    burger: 'LE MEGA BURGER',
   };
   function spawnBoss(){
     const kind = BOSS_KINDS[Math.floor(wave / 5 - 1) % BOSS_KINDS.length];
-    const hpMul = kind === 'iceberg' ? 1.15 : kind === 'mega' ? 0.9 : kind === 'popper' ? 0.85 : kind === 'spiral' ? 1.05 : 1;
+    const hpMul = kind === 'iceberg' ? 1.15 : kind === 'mega' ? 0.9 : kind === 'popper' ? 0.85 : kind === 'spiral' ? 1.05 : kind === 'burger' ? 1.2 : 1;
     const hp = Math.round((40 + wave * 12) * hpMul * cfg().bossHpMul);
-    const r = kind === 'iceberg' ? 38 : kind === 'mega' ? 40 : kind === 'popper' ? 40 : kind === 'spiral' ? 36 : 34;
+    const r = kind === 'iceberg' ? 38 : kind === 'mega' ? 40 : kind === 'popper' ? 40 : kind === 'spiral' ? 36 : kind === 'burger' ? 42 : 34;
     boss = {
       kind, x: W/2, y: -60, r, hp, maxHp: hp,
       t: 0, dir: 1, shootTimer: fireInterval(800), spawnTimer: 2800, jitterTimer: 900, spiralAngle: 0,
       hitFlash: 0, entering: true,
+      beams: [], beamTimer: 2600,
     };
     flashTimer = 260;
     shakeStage();
@@ -691,7 +694,7 @@
       playSound('explode');
     }
     else if (type === 'life') { lives = Math.min(6, lives + 1); pulseChip(livesEl); }
-    else if (type === 'laser' || type === 'missile') {
+    else if (type === 'laser' || type === 'missile' || type === 'flame') {
       weaponLevel = activeWeapon === type ? Math.min(2, weaponLevel + 1) : 1;
       activeWeapon = type; weaponTimer = WEAPON_DURATION;
     }
@@ -845,7 +848,7 @@
         x: player.x + rand(-4,4), y: player.y + player.r,
         vx: rand(-0.3,0.3), vy: rand(0.7,1.3),
         life: 260, maxLife: 260,
-        color: turboTimer > 0 ? '#fff35e' : activeWeapon === 'laser' ? '#ff8adf' : activeWeapon === 'missile' ? '#ffb238' : '#5ef1ff',
+        color: turboTimer > 0 ? '#fff35e' : activeWeapon === 'laser' ? '#ff8adf' : activeWeapon === 'missile' ? '#ffb238' : activeWeapon === 'flame' ? '#ff8a3d' : '#5ef1ff',
       });
       trailTimer = 40;
     }
@@ -860,6 +863,7 @@
       basic:   rapidTimer > 0 ? 130 : 240,
       laser:   rapidTimer > 0 ? 65  : 110,
       missile: rapidTimer > 0 ? 260 : 420,
+      flame:   rapidTimer > 0 ? 90  : 160,
     };
 
     const shotsPerSec = 1000 / cooldowns[activeWeapon];
@@ -923,7 +927,20 @@
             kind: 'missile',
             x: player.x + lane, y: player.y - player.r,
             vx: Math.sin(a) * speed, vy: -Math.cos(a) * speed,
-            r: 6, pierce, homing: true,
+            r: 6, pierce, homing: true, life: 6000, maxLife: 6000,
+          });
+        }
+      }
+    } else if (activeWeapon === 'flame') {
+      const speed = 7.5;
+      const lanes = weaponLevel >= 2 ? [-6, 6] : [0];
+      for (const a of angles){
+        for (const lane of lanes){
+          bullets.push({
+            kind: 'flame',
+            x: player.x + lane, y: player.y - player.r,
+            vx: Math.sin(a) * speed, vy: -Math.cos(a) * speed,
+            r: 5, pierce, life: 420, maxLife: 420,
           });
         }
       }
@@ -957,6 +974,7 @@
     const dtScale = dt / 16.67;
     for (let i = bullets.length - 1; i >= 0; i--){
       const b = bullets[i];
+      if (b.life !== undefined) { b.life -= dt; if (b.life <= 0) { bullets.splice(i,1); continue; } }
       if (b.homing) {
         const tgt = nearestTarget(b.x, b.y);
         if (tgt) {
@@ -1079,7 +1097,7 @@
       if (boss.y >= 90) boss.entering = false;
     } else {
       boss.t += dt;
-      const moveSpeed = boss.kind === 'iceberg' ? 1.6 : boss.kind === 'popper' ? 2.2 : boss.kind === 'spiral' ? 0.7 : 1.1;
+      const moveSpeed = boss.kind === 'iceberg' ? 1.6 : boss.kind === 'popper' ? 2.2 : boss.kind === 'spiral' ? 0.7 : boss.kind === 'burger' ? 0.85 : 1.1;
       boss.x += boss.dir * moveSpeed * dtScale;
       if (boss.x < 50) boss.dir = 1;
       if (boss.x > W - 50) boss.dir = -1;
@@ -1141,6 +1159,14 @@
             spawnEnemyBullet({ x: boss.x, y: boss.y + boss.r * 0.4, vx: Math.sin(a)*speed, vy: Math.cos(a)*speed, r: 5 });
           }
           boss.shootTimer = fireInterval(rand(900, 1400));
+        } else if (boss.kind === 'burger') {
+          const speed = Math.min(2.6 + wave * 0.03, 5);
+          let angles = wave >= 12 ? [-0.5, -0.25, 0, 0.25, 0.5] : [-0.3, 0, 0.3];
+          if (bombard) angles = [-0.65, ...angles, 0.65];
+          for (const a of angles){
+            spawnEnemyBullet({ x: boss.x, y: boss.y + boss.r, vx: Math.sin(a)*speed, vy: Math.cos(a)*speed, r: 5 });
+          }
+          boss.shootTimer = fireInterval(rand(1900, 2500));
         } else {
           const speed = Math.min(2.8 + wave * 0.04, 5);
           let angles = wave >= 10 ? [-0.4, -0.2, 0, 0.2, 0.4] : [-0.3, 0, 0.3];
@@ -1151,6 +1177,36 @@
           boss.shootTimer = fireInterval(rand(1400, 2000));
         }
       }
+
+      // Grill-sear beams: a distinct hazard shape (vertical corridors, not point
+      // bullets) — telegraphed red stripe, then a brief full-height damaging beam.
+      if (boss.kind === 'burger') {
+        const bombardBeam = mode === 'extreme';
+        boss.beamTimer -= dt;
+        if (boss.beamTimer <= 0) {
+          const lanes = bombardBeam ? 3 : 2;
+          const xs = [];
+          for (let k = 0; k < lanes; k++){
+            let x, tries = 0;
+            do { x = rand(40, W - 40); tries++; } while (xs.some(u => Math.abs(u - x) < 70) && tries < 8);
+            xs.push(x);
+            boss.beams.push({ x, half: 22, warn: 700, active: 380, state: 'warn' });
+          }
+          boss.beamTimer = fireInterval(rand(3000, 3800));
+        }
+        for (let i = boss.beams.length - 1; i >= 0; i--){
+          const bm = boss.beams[i];
+          if (bm.state === 'warn') {
+            bm.warn -= dt;
+            if (bm.warn <= 0) bm.state = 'active';
+          } else {
+            bm.active -= dt;
+            if (bm.active <= 0) { boss.beams.splice(i, 1); continue; }
+            if (invulnTimer <= 0 && Math.abs(player.x - bm.x) < bm.half + player.r * 0.6) hitPlayer();
+          }
+        }
+      }
+
       if (invulnTimer <= 0 && dist2(boss.x,boss.y,player.x,player.y) < (boss.r + player.r)*(boss.r + player.r)) {
         hitPlayer();
       }
@@ -1550,9 +1606,63 @@
     },
   };
 
+  // Weapon-specific accessories bolted onto the same airfryer hull — cannons for
+  // laser, wing missile pods for missile, exhaust vents for flame. weaponLevel
+  // mirrors the shoot() lane count (2 lanes -> paired accessory) so the ship
+  // reads the same loadout the bullets show.
+  const WEAPON_ACCESSORY_COLOR = { laser: '#ff2f8f', missile: '#ffb238', flame: '#ff5722' };
+  function drawShipAccessories(w, h){
+    if (activeWeapon === 'basic') return;
+    const color = WEAPON_ACCESSORY_COLOR[activeWeapon];
+    ctx.save();
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = color;
+    ctx.strokeStyle = 'rgba(0,0,0,.35)';
+    ctx.lineWidth = 1;
+
+    if (activeWeapon === 'laser') {
+      const barrels = weaponLevel >= 2 ? [-4, 4] : [0];
+      for (const bx of barrels) {
+        ctx.beginPath();
+        ctx.roundRect(bx - 2.2, -h/2 - 10, 4.4, 12, 2);
+        ctx.fill(); ctx.stroke();
+      }
+    } else if (activeWeapon === 'missile') {
+      const racks = weaponLevel >= 2 ? [0, 1] : [0];
+      for (const side of [-1, 1]) {
+        for (const rack of racks) {
+          const dy = -h * 0.12 + rack * 10;
+          ctx.beginPath();
+          ctx.moveTo(side * w * 0.5, dy - 5);
+          ctx.lineTo(side * (w * 0.5 + 9), dy);
+          ctx.lineTo(side * w * 0.5, dy + 5);
+          ctx.closePath();
+          ctx.fill(); ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(side * (w * 0.5 + 9), dy, 2.4, 0, Math.PI * 2);
+          ctx.fillStyle = '#fff';
+          ctx.fill();
+          ctx.fillStyle = color;
+        }
+      }
+    } else if (activeWeapon === 'flame') {
+      const scale = weaponLevel >= 2 ? 1.35 : 1;
+      for (const side of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(side * w * 0.42, h * 0.2);
+        ctx.lineTo(side * (w * 0.42 + 8 * scale), h * 0.48);
+        ctx.lineTo(side * w * 0.28, h * 0.42);
+        ctx.closePath();
+        ctx.fill(); ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
   function drawPlayer(){
     if (invulnTimer > 0 && Math.floor(invulnTimer/100) % 2 === 0) return;
-    const glowColor = turboTimer > 0 ? '#fff35e' : activeWeapon === 'laser' ? '#ff8adf' : activeWeapon === 'missile' ? '#ffb238' : '#5ef1ff';
+    const glowColor = turboTimer > 0 ? '#fff35e' : activeWeapon === 'laser' ? '#ff8adf' : activeWeapon === 'missile' ? '#ffb238' : activeWeapon === 'flame' ? '#ff8a3d' : '#5ef1ff';
     ctx.save();
     ctx.translate(player.x, player.y);
     ctx.shadowColor = glowColor;
@@ -1620,6 +1730,8 @@
       ctx.stroke();
     }
 
+    drawShipAccessories(w, h);
+
     ctx.restore();
   }
 
@@ -1627,6 +1739,7 @@
     basic:   { glow: '#5ef1ff', line: '#eafcff', dot: '#baf6ff', trail: 0.9 },
     laser:   { glow: '#ff2f8f', line: '#ffd6f0', dot: '#ff8adf', trail: 1.7 },
     missile: { glow: '#ffb238', line: '#ffd8a0', dot: '#ffb238', trail: 0.7 },
+    flame:   { glow: '#ff5722', line: '#ffddb0', dot: '#ff8a3d', trail: 1.3 },
   };
   function drawBullets(){
     ctx.save();
@@ -1634,6 +1747,7 @@
     ctx.lineCap = 'round';
     for (const b of bullets){
       const s = BULLET_STYLE[b.kind] || BULLET_STYLE.basic;
+      ctx.globalAlpha = b.life !== undefined ? clamp(b.life / b.maxLife, 0, 1) : 1;
       ctx.shadowBlur = 10;
       ctx.shadowColor = s.glow;
       ctx.strokeStyle = s.line;
@@ -1644,11 +1758,13 @@
     }
     for (const b of bullets){
       const s = BULLET_STYLE[b.kind] || BULLET_STYLE.basic;
+      ctx.globalAlpha = b.life !== undefined ? clamp(b.life / b.maxLife, 0, 1) : 1;
       ctx.shadowBlur = 6;
       ctx.shadowColor = s.dot;
       ctx.fillStyle = s.dot;
       ctx.beginPath(); ctx.arc(b.x,b.y,b.r,0,Math.PI*2); ctx.fill();
     }
+    ctx.globalAlpha = 1;
     ctx.shadowColor = '#ff5c3d';
     ctx.strokeStyle = '#ffb199';
     for (const b of enemyBullets){
@@ -1699,7 +1815,7 @@
     ctx.restore();
   }
 
-  const BOSS_GLOW = { sac: '#ff2f8f', iceberg: '#5ef1ff', mega: '#ff8a3d', spiral: '#ff8adf', popper: '#ffe27a' };
+  const BOSS_GLOW = { sac: '#ff2f8f', iceberg: '#5ef1ff', mega: '#ff8a3d', spiral: '#ff8adf', popper: '#ffe27a', burger: '#ffcf40' };
   const BOSS_DRAW = {
     sac(b){
       const r = b.r;
@@ -1830,6 +1946,94 @@
       }
       ctx.restore();
     },
+
+    burger(b){
+      const r = b.r;
+      ctx.save();
+      ctx.translate(b.x, b.y);
+
+      // bottom bun
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.8, r * 0.55);
+      ctx.lineTo(r * 0.8, r * 0.55);
+      ctx.lineTo(r * 0.7, r * 0.85);
+      ctx.lineTo(-r * 0.7, r * 0.85);
+      ctx.closePath();
+      let g = ctx.createLinearGradient(0, r * 0.4, 0, r * 0.9);
+      g.addColorStop(0, '#e8a355');
+      g.addColorStop(1, '#b06a26');
+      ctx.fillStyle = g;
+      ctx.fill();
+
+      // patty
+      ctx.beginPath();
+      ctx.ellipse(0, r * 0.28, r * 0.82, r * 0.22, 0, 0, Math.PI * 2);
+      g = ctx.createLinearGradient(0, r * 0.1, 0, r * 0.46);
+      g.addColorStop(0, '#7a4326');
+      g.addColorStop(1, '#4a2614');
+      ctx.fillStyle = g;
+      ctx.fill();
+
+      // melted cheese (jagged drip edge)
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.86, r * 0.02);
+      const teeth = 8;
+      for (let i = 0; i <= teeth; i++){
+        const x = -r * 0.86 + (r * 1.72) * (i / teeth);
+        const y = r * 0.02 + (i % 2 === 0 ? 0 : r * 0.12);
+        ctx.lineTo(x, y);
+      }
+      ctx.lineTo(r * 0.7, r * 0.2);
+      ctx.lineTo(-r * 0.7, r * 0.2);
+      ctx.closePath();
+      ctx.fillStyle = '#ffd23f';
+      ctx.fill();
+
+      // lettuce (wavy strip)
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.82, -r * 0.06);
+      const waves = [0, 0.08, -0.02, 0.09, 0, 0.07, -0.01];
+      for (let i = 0; i < waves.length; i++){
+        const x = -r * 0.82 + (r * 1.64) * (i / (waves.length - 1));
+        ctx.lineTo(x, -r * 0.06 + waves[i] * r);
+      }
+      ctx.lineTo(r * 0.72, r * 0.06);
+      ctx.lineTo(-r * 0.72, r * 0.06);
+      ctx.closePath();
+      ctx.fillStyle = '#7ed957';
+      ctx.fill();
+
+      // top bun with sesame seeds
+      ctx.beginPath();
+      ctx.arc(0, -r * 0.35, r * 0.88, Math.PI, 0);
+      ctx.lineTo(r * 0.8, -r * 0.05);
+      ctx.lineTo(-r * 0.8, -r * 0.05);
+      ctx.closePath();
+      g = ctx.createRadialGradient(-r * 0.2, -r * 0.6, r * 0.1, 0, -r * 0.35, r * 0.95);
+      g.addColorStop(0, '#ffcf7a');
+      g.addColorStop(1, '#d98a2e');
+      ctx.fillStyle = g;
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,.3)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.fillStyle = '#fff6da';
+      const seeds = [
+        [-r * 0.35, -r * 0.55, -0.2], [0, -r * 0.68, 0.1], [r * 0.35, -r * 0.55, 0.2],
+        [-r * 0.15, -r * 0.4, -0.1], [r * 0.18, -r * 0.4, 0.15],
+      ];
+      for (const [sx, sy, rot] of seeds){
+        ctx.save();
+        ctx.translate(sx, sy);
+        ctx.rotate(rot);
+        ctx.beginPath();
+        ctx.ellipse(0, 0, r * 0.06, r * 0.03, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+      ctx.restore();
+    },
   };
   function drawBoss(){
     if (!boss) return;
@@ -1850,6 +2054,30 @@
     ctx.restore();
     ctx.strokeStyle = 'rgba(255,255,255,.5)';
     ctx.strokeRect(W/2 - w/2, 14, w, 10);
+  }
+
+  function drawBossBeams(t){
+    if (!boss || !boss.beams.length) return;
+    ctx.save();
+    for (const bm of boss.beams){
+      if (bm.state === 'warn') {
+        const alpha = 0.22 + 0.18 * Math.sin(t / 70);
+        ctx.fillStyle = `rgba(255,90,40,${alpha})`;
+        ctx.fillRect(bm.x - bm.half * 0.5, 0, bm.half, H);
+      } else {
+        ctx.save();
+        ctx.shadowColor = '#ff6a1a';
+        ctx.shadowBlur = 22;
+        const g = ctx.createLinearGradient(bm.x - bm.half, 0, bm.x + bm.half, 0);
+        g.addColorStop(0, 'rgba(255,138,61,0)');
+        g.addColorStop(0.5, 'rgba(255,214,140,.95)');
+        g.addColorStop(1, 'rgba(255,138,61,0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(bm.x - bm.half, 0, bm.half * 2, H);
+        ctx.restore();
+      }
+    }
+    ctx.restore();
   }
 
   function drawWalls(){
@@ -1885,6 +2113,7 @@
     life:    { top: '#ffc2d9', bottom: '#e0356f' },
     laser:   { top: '#ffc2ef', bottom: '#c0268f' },
     missile: { top: '#ffcf9e', bottom: '#d9611f' },
+    flame:   { top: '#ffb199', bottom: '#c1290f' },
   };
   function drawBroccoli(x, y, r, type){
     const c = BROCCOLI_COLORS[type] || BROCCOLI_COLORS.spread;
@@ -2107,6 +2336,7 @@
     drawBullets();
     drawEnemies();
     drawBoss();
+    drawBossBeams(t);
     drawPlayer();
     drawFloatingTexts();
     drawCombo();
